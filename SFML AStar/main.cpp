@@ -251,6 +251,31 @@ bool nodeInPath(Node* n, Path* p )
 	return found;
 }
 
+void drawPath(sf::RenderWindow & w, Path & p)
+{
+	//If we don't have a path to draw, exit
+	if (p.empty())
+		return;
+
+	//Draw Arcs
+	for (Path::iterator vIter = p.begin(), vEnd = p.end(); vIter != vEnd; ++vIter)
+	{
+		Node* tempNode = (*vIter);
+
+		//If we have no previous, skip drawing
+		if (tempNode->getPrev() == NULL)
+			continue;
+
+		sf::Vertex line[] =
+		{
+			sf::Vertex(tempNode->position() + b, cPathArc),
+			sf::Vertex(tempNode->getPrev()->position() + b, cPathArc)
+		};
+
+		w.draw(line, 2, sf::Lines);
+	}
+}
+
 void drawGraph(sf::RenderWindow & const w, GraphType & const g, Path* p)
 {
 	//Set up variables for re-use
@@ -293,6 +318,9 @@ void drawGraph(sf::RenderWindow & const w, GraphType & const g, Path* p)
 		}
 		
 	}
+
+	//Draw Path
+	drawPath(w, *p);
 
 	//Draw Nodes
 	for (n = 0; n < numNodes; ++n)
@@ -441,23 +469,6 @@ bool clearNode()
 	return action;
 }
 
-void drawPath(sf::RenderWindow & w, Path & p, sf::Color c)
-{
-	//Draw Arcs
-	for (Path::iterator vIter = p.begin(), vEnd = p.end(); vIter != vEnd; ++vIter)
-	{
-		Node* tempNode = (*vIter);
-
-		sf::Vertex line[] =
-		{
-			sf::Vertex(tempNode->position() + b, cPathArc),
-			sf::Vertex(tempNode->getPrev()->position() + b, cPathArc)
-		};
-
-		w.draw(line, 2, sf::Lines);
-	}
-}
-
 bool runUCS(GraphType & g, Node* n1, Node* n2, Path & p)
 {
 	if (n1 != NULL && n2 != NULL)
@@ -479,6 +490,7 @@ bool runAStar(GraphType & g, Node* n1, Node* n2, Path & p)
 
 	else return false;
 }
+
 ////////////////////////////////////////////////////////////
 ///Entrypoint of application 
 //////////////////////////////////////////////////////////// 
@@ -494,7 +506,7 @@ int main()
 	cNode = sf::Color(66, 33, 99, 255);
 	cArc = sf::Color(196, 196, 196, 255);
 	cPathNode = sf::Color(0, 255, 255, 255);
-	cPathArc = sf::Color(255, 255, 255);
+	cPathArc = sf::Color(255, 255, 0, 2555);
 	cData = sf::Color(255, 255, 255, 255);
 	cG = sf::Color(200, 200, 200, 255);
 	cH = sf::Color(200, 200, 200, 255);
@@ -518,7 +530,7 @@ int main()
 
 	//Not working? (Q2Nodes and Q2Arcs)
 	//graph.breadthFirstPlus(graph.nodeArray()[0], graph.nodeArray()[15], visit);
-	graph.setVerbosity(2);
+	graph.setVerbosity(1);
 	Path path;
 
 	//UCS broke too fuck
