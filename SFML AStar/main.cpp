@@ -46,7 +46,7 @@ const sf::Mouse mouse;
 const sf::Keyboard keyboard;
 
 //Mouse click bools
-bool lc, lp, rc, rp;
+bool lc, lp, mc, mp, rc, rp;
 
 const int nodeRadius = 16;
 sf::Vector2f b(32, 32);
@@ -127,6 +127,7 @@ void outputUCSPathShort(Path* p)
 			cout << "-";
 		}
 	}
+	cout << endl; //End single line path
 }
 
 void outputAstarPathShort(Path* p)
@@ -234,8 +235,25 @@ bool mouseOverNode(const sf::Vector2f position, const sf::RenderWindow &w, float
 	else return false;
 }
 
-void drawGraph(sf::RenderWindow & w, GraphType & g)
+bool nodeInPath(Node* n, Path* p )
 {
+	bool found = false;
+
+	Path::iterator vIter = p->begin();
+	Path::iterator vEnd = p->end();
+
+	for (; vIter != vEnd; ++vIter)
+	{
+		if ((*vIter) == n)
+			return true;
+	}
+
+	return found;
+}
+
+void drawGraph(sf::RenderWindow & const w, GraphType & const g, Path* p)
+{
+	//Set up variables for re-use
 	int numNodes = g.count();
 	int n;
 
@@ -250,11 +268,12 @@ void drawGraph(sf::RenderWindow & w, GraphType & g)
 	//Draw Arcs
 	for (n = 0; n < numNodes; ++n)
 	{
-		for (list<Arc>::const_iterator vIter = g.nodeArray()[n]->arcList().begin(), vEnd = g.nodeArray()[n]->arcList().end(); vIter != vEnd; ++vIter)
+		Node* const tempNode = g.nodeArray()[n];
+		for (list<Arc>::const_iterator vIter = tempNode->arcList().begin(), vEnd = tempNode->arcList().end(); vIter != vEnd; ++vIter)
 		{
 			sf::Vertex line[] =
 			{
-				sf::Vertex(g.nodeArray()[n]->position() + b, cArc),
+				sf::Vertex(tempNode->position() + b, cArc),
 				sf::Vertex((*vIter).node()->position() + b, cArc)
 			};
 
@@ -279,7 +298,7 @@ void drawGraph(sf::RenderWindow & w, GraphType & g)
 	for (n = 0; n < numNodes; ++n)
 	{
 		//Pull out the node we're looking at
-		Node* tempNode = g.nodeArray()[n];
+		Node* const tempNode = g.nodeArray()[n];
 		circ.setPosition(tempNode->position() + b);
 
 		//If our mouse is on the node
@@ -294,9 +313,14 @@ void drawGraph(sf::RenderWindow & w, GraphType & g)
 			circ.setOrigin(nodeRadius, nodeRadius);
 			circ.setRadius(nodeRadius);
 		}
+
+		if (nodeInPath(tempNode, p))
+		{
+			circ.setFillColor(cPathNode);
+		}
 		
 		//Use the default colour
-		circ.setFillColor(cNode);
+		else circ.setFillColor(cNode);
 
 		//If we're the start, colour differently
 		if (nStart != NULL && tempNode == nStart)
@@ -317,7 +341,7 @@ void drawGraph(sf::RenderWindow & w, GraphType & g)
 
 		//Draw G
 		if (drawG)
-		{
+		{			
 			t.setCharacterSize(nodeRadius);
 			t.setPosition(tempNode->position() - sf::Vector2f(0, nodeRadius * 2));
 
@@ -365,24 +389,28 @@ bool setNode(GraphType &g, const sf::RenderWindow &w)
 	
 		if (mouseOverNode(tempNode->position() + b, w, nodeRadius))
 		{
+			//If we hit the start, unmark it
 			if (nStart == tempNode)
 			{
 				nStart = NULL;
 				action == true;
 			}
 
+			//If we hit the end, unmark it
 			else if (nEnd == tempNode)
 			{
 				nEnd = NULL;
 				action == true;
 			}
 
+			//If there's no start, mark this one
 			else if (nStart == NULL)
 			{
 				nStart = tempNode;
 				action = true;
 			}
 	
+			//If there's no end and it's not the start, mark this one
 			else if (nEnd == NULL && tempNode != nStart)
 			{
 				nEnd = tempNode;
@@ -415,9 +443,42 @@ bool clearNode()
 
 void drawPath(sf::RenderWindow & w, Path & p, sf::Color c)
 {
-	//for (Path::const_iterator)
+	//Draw Arcs
+	for (Path::iterator vIter = p.begin(), vEnd = p.end(); vIter != vEnd; ++vIter)
+	{
+		Node* tempNode = (*vIter);
+
+		sf::Vertex line[] =
+		{
+			sf::Vertex(tempNode->position() + b, cPathArc),
+			sf::Vertex(tempNode->getPrev()->position() + b, cPathArc)
+		};
+
+		w.draw(line, 2, sf::Lines);
+	}
 }
 
+bool runUCS(GraphType & g, Node* n1, Node* n2, Path & p)
+{
+	if (n1 != NULL && n2 != NULL)
+	{
+		g.UCS(n1, n2, empty, p);
+		return true;
+	}
+
+	else return false;
+}
+
+bool runAStar(GraphType & g, Node* n1, Node* n2, Path & p)
+{
+	if (n1 != NULL && n2 != NULL)
+	{
+		g.AStar(n1, n2, empty, p);
+		return true;
+	}
+
+	else return false;
+}
 ////////////////////////////////////////////////////////////
 ///Entrypoint of application 
 //////////////////////////////////////////////////////////// 
@@ -457,12 +518,12 @@ int main()
 
 	//Not working? (Q2Nodes and Q2Arcs)
 	//graph.breadthFirstPlus(graph.nodeArray()[0], graph.nodeArray()[15], visit);
-	graph.setVerbosity(0);
+	graph.setVerbosity(2);
 	Path path;
 
 	//UCS broke too fuck
-	graph.UCS(graph.nodeArray()[0], graph.nodeArray()[29], visit, path);
-	outputUCSPathShort(&path);
+	//graph.UCS(graph.nodeArray()[0], graph.nodeArray()[17], visit, path);
+	//outputUCSPathShort(&path);
 
 	//Who the hell knows about A*
 
@@ -485,31 +546,51 @@ int main()
 
 		//Input
 		lp = lc;
+		mp = mc;
 		rp = rc;
+
 		if (mouse.isButtonPressed(mouse.Left))
 			lc = true;
 		else lc = false;
 		
+		if (mouse.isButtonPressed(mouse.Middle))
+			mc = true;
+		else mc = false;
+
 		if (mouse.isButtonPressed(mouse.Right))
 			rc = true;
 		else rc = false;
 
-		//Left release
+		//Left release (Select/deselect nodes)
 		if (lp == true && lc == false)
 		{
 			setNode(graph, window);
 		}
 
-		//Right release
+		//Middle release(Reset nodes & Path)
+		if (mp == true && mc == false)
+		{
+			nStart = NULL;
+			nEnd = NULL;
+			path.clear();
+		}
+
+		//Right release (Run pathfinding if nodes selected, else clear path)
 		if (rp == true && rc == false)
 		{
-
+			if (nStart != NULL && nEnd != NULL)
+			{
+				runUCS(graph, nStart, nEnd, path);
+				//nStart = NULL;
+				//nEnd = NULL;
+				outputUCSPathShort(&path);
+			}
 		}
 
 		// Draw loop
 		window.clear(cBG);
 		
-		drawGraph(window, graph);
+		drawGraph(window, graph, &path);
 
 		window.display();
 

@@ -24,6 +24,12 @@ private:
 	int m_verbosity = 1; //Verbosity for output
 	stringstream gop; //Reusable stringstream for output
 	void gout(int verbosity); //Output function
+
+	//Preparations
+	void prepUCS();
+	void prepAStar();
+	void clearMarks();
+
 public:           
     // Constructor and destructor functions
     Graph( int size );
@@ -52,11 +58,6 @@ public:
 	//Dual Arcs
 	bool addDualArc(int n1, int n2, ArcType weight);
 	void removeDualArc(int n1, int n2);
-
-	//Preparations
-	void prepUCS();
-	void prepAStar();
-	void clearMarks();
 
 	//Graph exercises
     void depthFirst( Node* pNode, void (*pProcess)(Node*) );
@@ -228,8 +229,9 @@ bool Graph<NodeType, ArcType>::addDualArc(int n1, int n2, ArcType weight) {
 	}
 
 	if (proceed == true) {
-		// add the arc to the "from" node.
+		// add the arc to n1 and n2.
 		m_pNodes[n1]->addArc(m_pNodes[n2], weight);
+		m_pNodes[n2]->addArc(m_pNodes[n1], weight);
 
 		gop << "\t" << "Adding dual arc between " << m_pNodes[n1]->data() << " and " << m_pNodes[n2]->data() << " weight " << weight << endl;
 		gout(3);
@@ -491,42 +493,45 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 		list<Arc>::const_iterator endIter = pq.top()->arcList().end();
 	
 		//Process all children of the top node
-		for (; iter != endIter; iter++) {
+		for (; iter != endIter; iter++) 
+		{
+			//Pull out the node to test
+			Node* childNode = (*iter).node();
 
 			//if the previous node is not top of the queue
-			if ((*iter).node() != pq.top()->getPrev())
+			if (childNode != pq.top()->getPrev())
 			{
 				//Get total weight of this route
-				int c = pq.top()->getArc((*iter).node())->weight() + pq.top()->g();
+				int c = pq.top()->getArc(childNode)->weight() + pq.top()->g();
 
-				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << (*iter).node()->data() << " [" << c << " < " << ((*iter).node()->g()) << "]" << endl;
+				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << c << " < " << (childNode->g()) << "]" << endl;
 
 				//if it's lower than the weight of the current route
-				if (c < ((*iter).node()->g()))
+				if (c < (childNode->g()))
 				{
 					//Set the node's internal weight to the arc from previous plus internal weight of previous
-					(*iter).node()->setG(c);
+					childNode->setG(c);
 					//Set previous pointer of the node to the previous node in the new path
-					(*iter).node()->setPrev(pq.top());
+					childNode->setPrev(pq.top());
 
-					gop << "\t\t" << "True, " << (*iter).node()->data() << " g is now " << c << ", previous is now " << pq.top()->data() << endl;
+					gop << "\t\t" << "True, " << childNode->data() << " g is now " << c << ", previous is now " << pq.top()->data() << endl;
 
 				}
 
 				else
 				{
-					if ((*iter).node()->getPrev() != 0)
-						gop << "\t\t" << "False, " << (*iter).node()->data() << " g remaining " << ((*iter).node()->g()) << ", previous remains " << (*iter).node()->getPrev()->data() << endl;
-					else gop << "\t\t" << "False, " << (*iter).node()->data() << " g remaining " << ((*iter).node()->g()) << ", previous remains NULL" << endl;
+					if (childNode->getPrev() != 0)
+						gop << "\t\t" << "False, " << childNode->data() << " g remaining " << (childNode->g()) << ", previous remains " << childNode->getPrev()->data() << endl;
+					else gop << "\t\t" << "False, " << childNode->data() << " g remaining " << (childNode->g()) << ", previous remains NULL" << endl;
 				}
 
 				//if not marked
-				if ((*iter).node()->marked() == false) {
+				if (childNode->marked() == false) {
 					//add it to the queue and mark
-					pq.push((*iter).node());
-					gop << "Queueing:  " << (*iter).node()->data() << endl;
+					pq.push(childNode);
+					gop << "Queueing:  " << childNode->data() << endl;
 
-					(*iter).node()->setMarked(true);
+					childNode->setMarked(true);
 				}
 			}
 		}
@@ -539,6 +544,7 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 	gout(1);
 
 	//Add the nodes to path
+	path.clear();
 	while (pTarget->getPrev() != NULL)
 	{
 		path.push_back(pTarget);
@@ -592,40 +598,43 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 		//Process all children of the top node
 		for (; iter != endIter; iter++) 
 		{
+			//Pull out the node to test
+			Node * childNode = (*iter).node();
 
 			//if the previous node is not top of the queue
-			if ((*iter).node() != pq.top()->getPrev())
+			//ROSS: Child should be in pq?
+			if (childNode != pq.top()->getPrev())
 			{
 
 				//Get total weight of this route
-				float fn = pq.top()->g() + (*iter).node()->h();
+				float fn = pq.top()->g() + childNode->h();
 
-				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << (*iter).node()->data() << " [" << fn << " < " << ((*iter).node()->g()) << "]" << endl;
+				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << fn << " < " << (childNode->g()) << "]" << endl;
 
 				//if it's lower than the weight of the current route
-				if (fn < ((*iter).node()->g()))
+				if (fn < (childNode->g()))
 				{
 					//Set the node's internal weight to the arc from previous plus internal weight of previous
-					(*iter).node()->setG(fn);
+					childNode->setG(fn);
 					//Set previous pointer of the node to the previous node in the new path
-					(*iter).node()->setPrev(pq.top());
+					childNode->setPrev(pq.top());
 
-					gop << "\t\t" << "True, " << (*iter).node()->data() << " weight is now " << fn << ", previous is now " << pq.top()->data() << endl;
+					gop << "\t\t" << "True, " << childNode->data() << " weight is now " << fn << ", previous is now " << pq.top()->data() << endl;
 				}
 
 				else
 				{
-					if ((*iter).node()->getPrev() != 0)
-						gop << "\t\t" << "False, " << (*iter).node()->data() << " remaining " << ((*iter).node()->g()) << ", previous remains " << (*iter).node()->getPrev()->data() << endl;
-					else gop << "\t\t" << "False, " << (*iter).node()->data() << " remaining " << ((*iter).node()->g()) << ", previous remains NULL" << endl;
+					if (childNode->getPrev() != 0)
+						gop << "\t\t" << "False, " << childNode->data() << " remaining " << (childNode->g()) << ", previous remains " << childNode->getPrev()->data() << endl;
+					else gop << "\t\t" << "False, " << childNode->data() << " remaining " << (childNode->g()) << ", previous remains NULL" << endl;
 				}
 				
 				//if not marked
-				if ((*iter).node()->marked() == false) {
+				if (childNode->marked() == false) {
 					//add it to the queue and mark
-					pq.push((*iter).node());
-					(*iter).node()->setMarked(true);
-					gop << "Queueing:  " << (*iter).node()->data() << endl;
+					pq.push(childNode);
+					childNode->setMarked(true);
+					gop << "Queueing:  " << childNode->data() << endl;
 				}
 			}
 		}
@@ -638,6 +647,7 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 	gout(1);
 
 	//Add the nodes to path
+	path.clear();
 	while (pTarget->getPrev() != NULL)
 	{
 		path.push_back(pTarget);
