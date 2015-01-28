@@ -35,6 +35,9 @@ public:
     Graph( int size );
     ~Graph();
 
+	//Reset graph
+	void reset();
+
     // Accessors
 	Node** nodeArray() const { return m_pNodes; }
 	float heurMult() { return m_heurMult; }
@@ -103,6 +106,18 @@ Graph<NodeType, ArcType>::~Graph() {
 	delete m_pNodes;
 	gop << "Deconstructing Graph..." << endl;
 	gout(3);
+}
+
+template<class NodeType, class ArcType>
+void Graph<NodeType, ArcType>::reset()
+{
+	for (int n = 0; n < m_maxNodes; ++n)
+		if (m_pNodes[n] != 0)
+		{
+			m_pNodes[n]->setG(0);
+			m_pNodes[n]->setH(0);
+			clearMarks();
+		}
 }
 
 template<class NodeType, class ArcType>
@@ -666,7 +681,9 @@ void Graph<NodeType, ArcType>::gout(int verbosity)
 		cout << gop.str();
 	}
 	
+	
 	gop.str(string()); //Clear stringstream after attempting to output
+	string s = gop.str();
 }
 
 #include "GraphNode.hpp"

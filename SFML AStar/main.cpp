@@ -45,21 +45,22 @@ const int screenH = 480;
 const sf::Mouse mouse;
 const sf::Keyboard keyboard;
 
-//Mouse click bools
-bool lc, lp, mc, mp, rc, rp;
-
 const int nodeRadius = 16;
 sf::Vector2f b(32, 32);
 sf::Font f;
 sf::Text t;
-sf::Color cBG, cNode, cArc, cWeight, cPathNode, cPathArc, cData, cG, cH, cHover, cStart, cEnd;
+sf::Color cBG, cNode, cExp, cArc, cWeight, cPathNode, cPathArc, cData, cG, cH, cHover, cStart, cEnd;
 Node* nStart;
 Node* nEnd;
 
-bool drawG = false;
-bool drawH = false;
-bool drawW = false;
+bool drawD = 1;
+bool drawG = 1;
+bool drawH = 0;
+bool drawW = 0;
 
+bool AStar = 0;
+
+int menuItems = 5;
 ////////////////////////////////////////////////////////////
 ///Functions
 //////////////////////////////////////////////////////////// 
@@ -235,6 +236,22 @@ bool mouseOverNode(const sf::Vector2f position, const sf::RenderWindow &w, float
 	else return false;
 }
 
+template <typename T>
+string numToStr(T num)
+{
+	stringstream s;
+	s << num;
+	return s.str();
+}
+
+template <typename T>
+string numToStr(string prefix, T num)
+{
+	stringstream s;
+	s << prefix << num;
+	return s.str();
+}
+
 bool nodeInPath(Node* n, Path* p )
 {
 	bool found = false;
@@ -276,24 +293,13 @@ void drawPath(sf::RenderWindow & w, Path & p)
 	}
 }
 
-void drawGraph(sf::RenderWindow & const w, GraphType & const g, Path* p)
+void drawArcs(sf::RenderWindow & w, GraphType & const g)
 {
-	//Set up variables for re-use
-	int numNodes = g.count();
-	int n;
-
-	sf::CircleShape circ;
-	circ.setOrigin(nodeRadius, nodeRadius);
-	circ.setRadius(nodeRadius);
-
-	sf::Text t;
-	t.setFont(f);
-	t.setOrigin(nodeRadius / 2, nodeRadius + nodeRadius / 2);
-
 	//Draw Arcs
-	for (n = 0; n < numNodes; ++n)
+	for (int n = 0, numNodes = g.count(); n < numNodes; ++n)
 	{
 		Node* const tempNode = g.nodeArray()[n];
+
 		for (list<Arc>::const_iterator vIter = tempNode->arcList().begin(), vEnd = tempNode->arcList().end(); vIter != vEnd; ++vIter)
 		{
 			sf::Vertex line[] =
@@ -308,22 +314,27 @@ void drawGraph(sf::RenderWindow & const w, GraphType & const g, Path* p)
 			if (drawW)
 			{
 				t.setCharacterSize(nodeRadius * 2);
-				t.setPosition(midpoint(line[0].position, line[1].position));
-				//Remove next line for testing what the hell is happening with strings
-				t.setPosition(50, 10 * n);
-				t.setString("" + (*vIter).weight());
+				t.setPosition(midpoint(line[0].position, line[1].position) + b);
+				t.setString(numToStr("W: ", (*vIter).weight()));
 				t.setColor(cWeight);
 				w.draw(t);
 			}
 		}
-		
+
 	}
+}
 
-	//Draw Path
-	drawPath(w, *p);
+void drawNodes(sf::RenderWindow & const w, GraphType & const g, Path & p)
+{
+	sf::CircleShape circ;
+	circ.setOrigin(nodeRadius, nodeRadius);
+	circ.setRadius(nodeRadius);
 
-	//Draw Nodes
-	for (n = 0; n < numNodes; ++n)
+	sf::Text t;
+	t.setFont(f);
+	t.setOrigin(nodeRadius / 2, nodeRadius + nodeRadius / 2);
+
+	for (int n = 0, numNodes = g.count(); n < numNodes; ++n)
 	{
 		//Pull out the node we're looking at
 		Node* const tempNode = g.nodeArray()[n];
@@ -342,45 +353,54 @@ void drawGraph(sf::RenderWindow & const w, GraphType & const g, Path* p)
 			circ.setRadius(nodeRadius);
 		}
 
-		if (nodeInPath(tempNode, p))
+		//If we're in the path use path colour
+		if (nodeInPath(tempNode, &p))
 		{
 			circ.setFillColor(cPathNode);
 		}
-		
-		//Use the default colour
+
+		else if (tempNode->marked())
+		{
+			circ.setFillColor(cExp);
+		}
+
+		//Else se the default colour
 		else circ.setFillColor(cNode);
 
 		//If we're the start, colour differently
 		if (nStart != NULL && tempNode == nStart)
-				circ.setFillColor(cStart);
-		
+			circ.setFillColor(cStart);
+
 		//Or if we're the end
 		else if (nEnd != NULL && tempNode == nEnd)
 			circ.setFillColor(cEnd);
 
+		//Finally, draw the node
 		w.draw(circ);
 
 		//Draw Data
-		t.setCharacterSize(nodeRadius * 2);
-		t.setPosition(tempNode->position() + b);
-		t.setString(tempNode->data());
-		t.setColor(cData);
-		w.draw(t);
+		if (drawD)
+		{
+			t.setCharacterSize(nodeRadius * 2);
+			t.setPosition(tempNode->position() + b);
+			t.setString(tempNode->data());
+			t.setColor(cData);
+			w.draw(t);
+		}
 
 		//Draw G
 		if (drawG)
-		{			
+		{
 			t.setCharacterSize(nodeRadius);
-			t.setPosition(tempNode->position() - sf::Vector2f(0, nodeRadius * 2));
+			t.setPosition((tempNode->position() + b) - sf::Vector2f(0, nodeRadius / 2));
 
-			//The whole string stream is going fucken loopy
 			int g = tempNode->g();
-			if (g > 1000)
+			if (g >= INT_MAX)
 			{
 				t.setString("MAX");
 			}
 
-			else t.setString("" + g);
+			else t.setString(numToStr(g));
 
 			t.setColor(cG);
 			w.draw(t);
@@ -390,8 +410,8 @@ void drawGraph(sf::RenderWindow & const w, GraphType & const g, Path* p)
 		if (drawH)
 		{
 			t.setCharacterSize(nodeRadius);
-			t.setPosition(tempNode->position() + sf::Vector2f(0, nodeRadius * 2));
-			//t.setString(tempNode->h());
+			t.setPosition(tempNode->position() + sf::Vector2f(0, nodeRadius * 2) + b);
+			t.setString(numToStr("H: ", tempNode->h()));
 			t.setColor(cH);
 			w.draw(t);
 		}
@@ -399,11 +419,48 @@ void drawGraph(sf::RenderWindow & const w, GraphType & const g, Path* p)
 
 
 	}
+}
 
+void drawGraph(sf::RenderWindow & const w, GraphType & const g, Path* p)
+{
+	//Set up variables for re-use
+	int numNodes = g.count();
+	int n;
 
-	//Draw its data
+	//Draw Arcs
+	drawArcs(w, g);
 
-	//Draw its h and g values
+	//Draw Path
+	drawPath(w, *p);
+
+	//Draw Nodes
+	drawNodes(w, g, *p);
+}
+
+void drawMenu(sf::RenderWindow & const w, sf::Vector2f pos)
+{
+	sf::Vector2f iPos(pos);
+	sf::Vector2f space(nodeRadius, nodeRadius);
+
+	sf::Text t;
+	t.setFont(f);
+	t.setOrigin(nodeRadius / 2, nodeRadius / 2);
+
+	stringstream s;
+
+	//D
+	s << "D: " << drawD << endl;
+	t.setString(s.str());
+	t.setPosition(pos + (space * 0.0));
+
+	//G
+
+	//H
+
+	//W
+
+	//A
+
 }
 
 bool setNode(GraphType &g, const sf::RenderWindow &w)
@@ -502,24 +559,20 @@ int main()
 	//Set up assets & drawing stuff
 	f.loadFromFile("FORCED SQUARE.ttf");
 
+	//Set up colours
 	cBG = sf::Color(64, 64, 64, 255);
 	cNode = sf::Color(66, 33, 99, 255);
+	cExp = sf::Color(132, 66, 198, 255);
 	cArc = sf::Color(196, 196, 196, 255);
 	cPathNode = sf::Color(0, 255, 255, 255);
 	cPathArc = sf::Color(255, 255, 0, 2555);
 	cData = sf::Color(255, 255, 255, 255);
-	cG = sf::Color(200, 200, 200, 255);
-	cH = sf::Color(200, 200, 200, 255);
+	cG = sf::Color(100, 200, 100, 255);
+	cH = sf::Color(200, 200, 100, 255);
 	cHover = sf::Color(250, 150, 50, 255);
 	cStart = sf::Color(0, 255, 0, 255);
 	cEnd = sf::Color(255, 0, 0, 255);
-
-	//Debug text I guess?
-	t.setFont(f);
-	t.setColor(sf::Color::White);
-	t.setCharacterSize(30);
-	t.setPosition(sf::Vector2f(400, 50));
-
+	
 	//Set up graph
 	Graph<string, int> graph(30);
 	loadGraphDrawable(graph, "AStarNodes.txt", "AStarArcs.txt");
@@ -530,10 +583,11 @@ int main()
 
 	//Not working? (Q2Nodes and Q2Arcs)
 	//graph.breadthFirstPlus(graph.nodeArray()[0], graph.nodeArray()[15], visit);
-	graph.setVerbosity(1);
+
+	graph.setVerbosity(2);
 	Path path;
 
-	//UCS broke too fuck
+	//UCS broke too fuck j/k my graph was wrong (AStar Arcs and Nodes)
 	//graph.UCS(graph.nodeArray()[0], graph.nodeArray()[17], visit, path);
 	//outputUCSPathShort(&path);
 
@@ -556,53 +610,144 @@ int main()
 
 		}
 
+#pragma region INPUT
+
 		//Input
-		lp = lc;
-		mp = mc;
-		rp = rc;
+		static bool lMouse;
+		static bool rMouse;
+		static bool mMouse;
 
+		static bool a;
+		static bool d;
+		static bool g;
+		static bool h;
+		static bool w;
+
+		// Left Mouse: Set/unset node
 		if (mouse.isButtonPressed(mouse.Left))
-			lc = true;
-		else lc = false;
+		{
+			if (!lMouse)
+				setNode(graph, window);
+			lMouse = true;
+		}
+
+		else lMouse = false;
 		
+		// Middle Mouse : Clear everything
 		if (mouse.isButtonPressed(mouse.Middle))
-			mc = true;
-		else mc = false;
-
-		if (mouse.isButtonPressed(mouse.Right))
-			rc = true;
-		else rc = false;
-
-		//Left release (Select/deselect nodes)
-		if (lp == true && lc == false)
 		{
-			setNode(graph, window);
-		}
-
-		//Middle release(Reset nodes & Path)
-		if (mp == true && mc == false)
-		{
-			nStart = NULL;
-			nEnd = NULL;
-			path.clear();
-		}
-
-		//Right release (Run pathfinding if nodes selected, else clear path)
-		if (rp == true && rc == false)
-		{
-			if (nStart != NULL && nEnd != NULL)
+			if (!mMouse)
 			{
-				runUCS(graph, nStart, nEnd, path);
-				//nStart = NULL;
-				//nEnd = NULL;
-				outputUCSPathShort(&path);
+				nStart = NULL;
+				nEnd = NULL;
+				path.clear();
+				graph.reset();
 			}
+			mMouse = true;
 		}
+
+		else mMouse = false;
+
+		// Right Mouse : Run Pathfinding
+		if (mouse.isButtonPressed(mouse.Right))
+		{
+			if (!rMouse)
+			{
+				if (nStart != NULL && nEnd != NULL)
+				{
+					if (AStar)
+						runAStar(graph, nStart, nEnd, path);
+
+					else runUCS(graph, nStart, nEnd, path);
+					//nStart = nEnd = NULL;
+					outputUCSPathShort(&path);
+				}
+			}
+
+			rMouse = true;
+		}
+
+		else rMouse = false;
+
+
+		// D : Toggle weight drawing
+		if (keyboard.isKeyPressed(keyboard.A))
+		{
+			if (!a)
+			{
+				AStar = !AStar;
+			}
+
+			a = true;
+		}
+
+		else a = false;
+
+		// W : Toggle weight drawing
+		if (keyboard.isKeyPressed(keyboard.W))
+		{
+			if (!w)
+			{
+				drawW = !drawW;
+			}
+
+			w = true;
+		}
+
+		else w = false;
+
+
+		// G : Toggle g drawing
+		if (keyboard.isKeyPressed(keyboard.G))
+		{
+			if (!g)
+			{
+				drawG = !drawG;
+			}
+
+			g = true;
+		}
+
+		else g = false;
+
+
+		// H : Toggle h drawing
+		if (keyboard.isKeyPressed(keyboard.H))
+		{
+			if (!h)
+			{
+				drawH = !drawH;
+			}
+
+			h = true;
+		}
+
+		else h = false;
+
+
+		// D : Toggle weight drawing
+		if (keyboard.isKeyPressed(keyboard.D))
+		{
+			if (!d)
+			{
+				drawD = !drawD;
+			}
+
+			d = true;
+		}
+
+		else d = false;
+
+#pragma endregion
 
 		// Draw loop
 		window.clear(cBG);
 		
 		drawGraph(window, graph, &path);
+
+		//Pack up menu items
+
+		drawMenu();
 
 		window.display();
 
