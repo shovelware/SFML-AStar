@@ -67,6 +67,7 @@ public:
 	void breadthFirst(Node* pNode, void(*pProcess)(Node*));
 	void breadthFirstPlus(Node* pNode, Node* pTarget, void(*pProcess)(Node*));
 	void UCS(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path);
+	void UCSA(Node* pStart, Node* pTarget, void(*pProcess)(Node*));
 	void AStar(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path);
 };
 
@@ -526,6 +527,9 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 				{
 					//Set the node's internal weight to the arc from previous plus internal weight of previous
 					childNode->setG(c);
+
+					//Update the priority queue
+
 					//Set previous pointer of the node to the previous node in the new path
 					childNode->setPrev(pq.top());
 
@@ -552,7 +556,9 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 		}
 		gop << "Popping: " << pq.top()->data() << endl << endl;
 		gout(2);
+
 		pq.pop();
+		make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
 	}
 	
 	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " complete. ===" << endl << endl;
@@ -571,6 +577,19 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 }
 
 template<class NodeType, class ArcType>
+void Graph<NodeType, ArcType>::UCSA(Node* pStart, Node* pTarget, void(*pProcess)(Node*))
+{
+	vector<Node*> UCSP;
+	UCS(pTarget, pStart, pProcess, UCSP);
+
+	//Walk back through the path and set h values to 90% of distance to goal
+	for (vector<Node*>::iterator vIter = UCSP.begin(), vEnd = UCSP.end(); vIter < vEnd; vIter++)
+	{
+		(*vIter)->setH((*vIter)->g() * m_heurMult);
+	}
+}
+
+template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path)
 {
 	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
@@ -578,19 +597,11 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 	gout(1);
 
 	//Init h by way of UCS
-	vector<Node*> UCSP;
-	UCS(pStart, pTarget, pProcess, UCSP);
+	UCSA(pStart, pTarget, pProcess);
 
 	//init distances and unmark
 	prepAStar();
 	pStart->setG(0);
-
-	int gn = 0;
-	for (vector<Node*>::iterator vIter = UCSP.begin(), vEnd = UCSP.end(); vIter < vEnd; vIter++)
-	{
-		(*vIter)->setH(gn);
-		gn = (*vIter)->g() * m_heurMult;
-	}
 
 	clearMarks();
 	//make & set up queue
