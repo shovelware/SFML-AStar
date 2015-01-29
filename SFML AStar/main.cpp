@@ -1,4 +1,4 @@
-//////////////////////////////////////////////////////////// 
+﻿//////////////////////////////////////////////////////////// 
 // Headers 
 //////////////////////////////////////////////////////////// 
 #ifdef _DEBUG 
@@ -332,10 +332,11 @@ void drawArcs(sf::RenderWindow & w, GraphType & const g)
 				t.setPosition(wPos);
 				t.setString(numToStr((*vIter).weight()));
 				t.setColor(cWeight);
+				t.setOrigin(tOrigin);
 
-				//line[0] = sf::Vertex(wPos, cArc);
-				//line[1] = sf::Vertex(t.getPosition() - t.getOrigin(), cArc);
-				//w.draw(line, 2, sf::Lines);
+				line[0] = sf::Vertex(wPos, cArc);
+				line[1] = sf::Vertex(t.getPosition(), cArc);
+				w.draw(line, 2, sf::Lines);
 
 				w.draw(t);
 			}
@@ -412,12 +413,13 @@ void drawNodes(sf::RenderWindow & const w, GraphType & const g, Path & p)
 		if (drawG)
 		{
 			t.setCharacterSize(fG);
-			t.setPosition((tempNode->position() + b) - sf::Vector2f(0, nodeRadius / 2));
+			t.setPosition((tempNode->position() + b) - sf::Vector2f(nodeRadius / 2, nodeRadius / 2));
 
+			//Correct for max
 			int g = tempNode->g();
 			if (g >= INT_MAX)
 			{
-				t.setString("MAX");
+				t.setString("oo");
 			}
 
 			else t.setString(numToStr(g));
@@ -430,8 +432,16 @@ void drawNodes(sf::RenderWindow & const w, GraphType & const g, Path & p)
 		if (drawH)
 		{
 			t.setCharacterSize(fH);
-			t.setPosition(tempNode->position() + sf::Vector2f(0, nodeRadius * 2) + b);
-			t.setString(numToStr(tempNode->h()));
+			t.setPosition((tempNode->position() + b) + sf::Vector2f(nodeRadius * 2, nodeRadius * 2));
+
+			int h = tempNode->h();
+			if (h >= (FLT_MAX - 2000.0))
+			{
+				t.setString("MAX");
+			}
+
+			else t.setString(numToStr(tempNode->h()));
+
 			t.setColor(cH);
 			w.draw(t);
 		}
@@ -612,7 +622,7 @@ int main()
 	cNode = sf::Color(66, 33, 99, 255);
 	cExp = sf::Color(132, 66, 198, 255);
 	cArc = sf::Color(196, 196, 196, 255);
-	cWeight = sf::Color(196, 0, 196, 255);
+	cWeight = sf::Color(196, 128, 128, 255);
 	cPathNode = sf::Color(0, 255, 255, 255);
 	cPathArc = sf::Color(255, 255, 0, 2555);
 	cData = sf::Color(255, 255, 255, 255);
@@ -714,8 +724,8 @@ int main()
 				if (nStart != NULL && nEnd != NULL)
 				{
 					if (AStar)
-						runUCSA(graph, nStart, nEnd);
-						//runAStar(graph, nStart, nEnd, path);
+						//runUCSA(graph, nStart, nEnd);
+						runAStar(graph, nStart, nEnd, path);
 
 					else runUCS(graph, nStart, nEnd, path);
 					//nStart = nEnd = NULL;

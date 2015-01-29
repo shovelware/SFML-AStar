@@ -332,7 +332,7 @@ void Graph<NodeType, ArcType>::prepAStar()
 	int index;
 	for (index = 0; index < m_maxNodes; index++) {
 		if (m_pNodes[index] != 0) {
-			m_pNodes[index]->setH(FLT_MAX - 1000);
+			m_pNodes[index]->setH(FLT_MAX - 1000.0);
 			m_pNodes[index]->setMarked(false);
 			m_pNodes[index]->setPrev(NULL);
 
@@ -484,12 +484,13 @@ void Graph<NodeType, ArcType>::breadthFirstPlus(Node* pNode, Node* pTarget, void
 template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path)
 {
+	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
+	gout(1);
+
 	//init distances and unmark
 	prepUCS();
 	pStart->setG(0);
 
-	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
-	gout(1);
 
 	//make & set up queue
 	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
@@ -512,7 +513,7 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 		for (; iter != endIter; iter++) 
 		{
 			//Pull out the node to test
-			Node* childNode = (*iter).node();
+			Node* childNode = iter->node();
 
 			//if the previous node is not top of the queue
 			if (childNode != pq.top()->getPrev())
@@ -527,8 +528,6 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 				{
 					//Set the node's internal weight to the arc from previous plus internal weight of previous
 					childNode->setG(c);
-
-					//Update the priority queue
 
 					//Set previous pointer of the node to the previous node in the new path
 					childNode->setPrev(pq.top());
@@ -549,7 +548,6 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 					//add it to the queue and mark
 					pq.push(childNode);
 					gop << "Queueing:  " << childNode->data() << endl;
-
 					childNode->setMarked(true);
 				}
 			}
@@ -557,8 +555,8 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 		gop << "Popping: " << pq.top()->data() << endl << endl;
 		gout(2);
 
-		pq.pop();
 		make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
+		pq.pop();
 	}
 	
 	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " complete. ===" << endl << endl;
@@ -596,14 +594,17 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 	gop << "(UCS used to initialise h values)" << endl << endl;
 	gout(1);
 
-	//Init h by way of UCS
-	UCSA(pStart, pTarget, pProcess);
 
 	//init distances and unmark
 	prepAStar();
-	pStart->setG(0);
 
+	//Init h by way of UCS
+	UCSA(pStart, pTarget, pProcess);
+
+	//Clean up after UCSA
+	pStart->setG(0);
 	clearMarks();
+
 	//make & set up queue
 	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
 
@@ -625,15 +626,14 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 		for (; iter != endIter; iter++) 
 		{
 			//Pull out the node to test
-			Node * childNode = (*iter).node();
+			Node * childNode = iter->node();
 
 			//if the previous node is not top of the queue
-			//ROSS: Child should be in pq?
 			if (childNode != pq.top()->getPrev())
 			{
 
-				//Get total weight of this route
-				float fn = pq.top()->g() + childNode->h();
+				//Get f of this route
+				float fn = pq.top()->g() + iter->weight() + childNode->h();
 
 				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << fn << " < " << (childNode->g()) << "]" << endl;
 
@@ -659,13 +659,15 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 				if (childNode->marked() == false) {
 					//add it to the queue and mark
 					pq.push(childNode);
-					childNode->setMarked(true);
 					gop << "Queueing:  " << childNode->data() << endl;
+					childNode->setMarked(true);
 				}
 			}
 		}
 		gop << "Popping: " << pq.top()->data() << endl << endl;
 		gout(2);
+
+		make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
 		pq.pop();
 	}
 

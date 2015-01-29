@@ -1,0 +1,1 @@
+http://www.cs.cmu.edu/~cga/ai-course/astar.pdf
