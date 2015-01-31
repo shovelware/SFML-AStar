@@ -89,6 +89,7 @@
   <ItemGroup>
     <ClInclude Include="Graph.hpp" />
     <ClInclude Include="GraphArc.hpp" />
+    <ClInclude Include="GraphMap.hpp" />
     <ClInclude Include="GraphNode.hpp" />
   </ItemGroup>
   <ItemGroup>

@@ -14,7 +14,7 @@ public:
     GraphNode<NodeType, ArcType>* node() const { return m_pNode; }
 	ArcType weight() const { return m_weight; }
 
-    // Manipulator functions
+    // Manipulator functionsck
     void setNode(GraphNode<NodeType, ArcType>* pNode) { m_pNode = pNode; }    
     void setWeight(ArcType weight) { m_weight = weight; }
 };

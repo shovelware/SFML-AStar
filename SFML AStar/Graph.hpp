@@ -9,6 +9,8 @@ using namespace std;
 
 template <class NodeType, class ArcType> class GraphArc;
 template <class NodeType, class ArcType> class GraphNode;
+typedef vector<pair<char, float>> HeurVec;
+typedef vector<pair<char, HeurVec>> HeurMap;
 
 template<class NodeType, class ArcType>
 class Graph {
@@ -21,9 +23,19 @@ private:
     int m_count;
 	float m_heurMult; //Heuristic multiplier for A*
 
+	//Output
 	int m_verbosity = 1; //Verbosity for output
 	stringstream gop; //Reusable stringstream for output
 	void gout(int verbosity); //Output function
+
+	//Map of heuristics for this graph
+	HeurMap m_map = NULL; //Map will be null by default
+	float distanceBetween(const sf::Vector2f v1, const sf::Vector2f v2);
+	float mapLookup(Node* pStart, Node* pEnd);
+
+	//Maximum H and G values
+	const int maxG = INT_MAX - 20000;
+	const int maxH = FLT_MAX - 20000;
 
 	//Preparations
 	void prepUCS();
@@ -43,6 +55,7 @@ public:
 	float heurMult() { return m_heurMult; }
 	int verbosity() { return verbosity; }
 	int count() { return m_count; }
+	bool heurMap() {return }
 
 	// Manipulators
 	void setHeurMult(float HeurMult) { m_heurMult = HeurMult; }
@@ -61,6 +74,9 @@ public:
 	//Dual Arcs
 	bool addDualArc(int n1, int n2, ArcType weight);
 	void removeDualArc(int n1, int n2);
+
+	//Mapping
+	void genMap();
 
 	//Graph exercises
     void depthFirst( Node* pNode, void (*pProcess)(Node*) );
@@ -345,6 +361,71 @@ void Graph<NodeType, ArcType>::prepAStar()
 	gout(1);
 }
 
+template<class NodeType, class ArcType>
+float Graph<NodeType, ArcType>::distanceBetween(const sf::Vector2f v1, const sf::Vector2f v2)
+{
+	return sqrt(pow(v2.x - v1.x, 2) + pow(v2.y - v1.y, 2));
+}
+
+template<class NodeType, class ArcType>
+void Graph<NodeType, ArcType>::genMap()
+{
+	HeurMap map;
+	HeurVec temp;
+
+	Node* nodeI;
+	Node* nodeJ;
+
+	int c = m_count - 1;
+
+	//For each node I
+	for (int i = 0; i < c; ++i)
+	{
+		nodeI = m_pNodes[i];
+
+		//For each other node J (including I!)
+		for (int j = 0; j < c; ++j)
+		{
+			nodeJ = m_pNodes[j];
+			//Add J and the euclidian distance to it to the map
+			temp.push_back(make_pair(nodeJ->data(), distanceBetween(nodeI->position(), nodeJ->position())));
+		}
+
+		//Then add I and the list of distances to the map
+		map.push_back(make_pair(nodeI->data(), temp));
+	}
+
+	gop << "Heuristic map generated." << endl;
+	gout(1);
+
+	m_map = map;
+}
+
+template<class NodeType, class ArcType>
+float Graph<NodeType, ArcType>::mapLookup(Node* pStart, Node* pEnd)
+{
+	//Distance will be maximum if not found
+	float distance = maxH;
+
+	//Find starting node in map
+	for (HeurMap::iterator mIter = m_map.begin(), mEnd = m_map.end(); mIter < mEnd; ++mIter)
+	{
+		if (mIter->first == pStart->data())
+		{
+			//Find the second node in heuristic vector for first node
+			for (HeurVec::iterator vIter = mIter->second.begin(), vEnd = mIter->second.end(); vIter < vEnd; ++vIter)
+			{
+				if (vIter->first == pEnd.data())
+				{
+					distance = mIter->second();
+				}
+			}
+		}
+	}
+
+	return distance;
+}
+
 // ----------------------------------------------------------------
 //  Name:           depthFirst
 //  Description:    Performs a depth-first traversal on the specified 
@@ -601,12 +682,12 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 	//Init h by way of UCS
 	UCSA(pStart, pTarget, pProcess);
 
+	//make & set up queue
+	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
+
 	//Clean up after UCSA
 	pStart->setG(0);
 	clearMarks();
-
-	//make & set up queue
-	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
 
 	//Start of UCS
 	pq.push(pStart);
@@ -628,11 +709,11 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 			//Pull out the node to test
 			Node * childNode = iter->node();
 
-			//if the previous node is not top of the queue
-			if (childNode != pq.top()->getPrev())
+			//if the previous node is not top of the queue & Not marked
+			if (childNode != pq.top()->getPrev() && !childNode->marked())
 			{
 
-				//Get f of this route
+				//Get f of this route (Weight to parent + arc to child + child h to goal)
 				float fn = pq.top()->g() + iter->weight() + childNode->h();
 
 				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << fn << " < " << (childNode->g()) << "]" << endl;

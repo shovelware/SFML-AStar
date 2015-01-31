@@ -35,8 +35,10 @@ typedef GraphNode<char, int> Node;
 
 typedef vector<Node*> Path;
 
+//Vector of <endNode, heuristic>
+typedef vector<pair<char, float>> HeurVec;
 //Heuristic map is a vector<startNode, vector<endNode, heuristic>>
-typedef vector<char, vector<char, float>> HeurMap;
+typedef vector<pair<char, HeurVec>> HeurMap;
 
 ////////////////////////////////////////////////////////////
 ///Global Variables
@@ -57,11 +59,25 @@ sf::Color cBG, cNode, cExp, cArc, cWeight, cPathNode, cPathArc, cData, cG, cH, c
 float fD, fH, fG, fW;
 sf::Vector2f tOrigin;
 
-//Start and end nodes
+//Buttons
+sf::FloatRect btnUCSPF;
+sf::FloatRect btnPrcmp;
+sf::FloatRect btnAStar;
+sf::FloatRect btnReset;
+sf::FloatRect btnRandm;
+sf::Color cBtn, cBtnHover, cBtnPress, cTxt, cTxtHover, cTxtPress;
+
+//Graph, path, start and end nodes
+Graph<char, int> graph(30);
+Path path;
 Node* nStart;
 Node* nEnd;
 
-//Bools for toggling drawing of certain objects
+//Maximum values
+const int maxG = INT_MAX - 20000;
+const int maxH = FLT_MAX - 20000;
+
+//Bools for toggling drawing of graph data
 bool drawD = 1;
 bool drawG = 1;
 bool drawH = 1;
@@ -238,9 +254,20 @@ sf::Vector2f midpoint(const sf::Vector2f v1, const sf::Vector2f v2)
 	return sf::Vector2f((v2.x + v1.x) / 2.0, (v2.y + v1.y) / 2.0);
 }
 
-bool mouseOverNode(const sf::Vector2f position, const sf::RenderWindow &w, float radius)
+bool mouseOverNode(const sf::Vector2f position, const sf::RenderWindow & w, float radius)
 {
 	if (distanceBetween(position, sf::Vector2f(mouse.getPosition(w))) < radius)
+		return true;
+
+	else return false;
+}
+
+bool mouseOverButton(const sf::FloatRect button, const sf::RenderWindow & w)
+{
+	sf::Vector2i mPos(mouse.getPosition(w));
+
+	if (button.left < mPos.x && mPos.x < button.left + button.width
+		&& button.top < mPos.y && mPos.y < button.top + button.height)
 		return true;
 
 	else return false;
@@ -417,9 +444,9 @@ void drawNodes(sf::RenderWindow & const w, GraphType & const g, Path & p)
 
 			//Correct for max
 			int g = tempNode->g();
-			if (g >= INT_MAX)
+			if (g >= maxG)
 			{
-				t.setString("oo");
+				t.setString("MAX");
 			}
 
 			else t.setString(numToStr(g));
@@ -434,8 +461,8 @@ void drawNodes(sf::RenderWindow & const w, GraphType & const g, Path & p)
 			t.setCharacterSize(fH);
 			t.setPosition((tempNode->position() + b) + sf::Vector2f(nodeRadius * 2, nodeRadius * 2));
 
-			int h = tempNode->h();
-			if (h >= (FLT_MAX - 2000.0))
+			float h = tempNode->h();
+			if (h >= maxH)
 			{
 				t.setString("MAX");
 			}
@@ -467,7 +494,71 @@ void drawGraph(sf::RenderWindow & const w, GraphType & const g, Path* p)
 	drawNodes(w, g, *p);
 }
 
-void drawMenu(sf::RenderWindow & const w, sf::Vector2f pos)
+void drawButton(sf::RenderWindow & const w, sf::FloatRect & btn, string str)
+{
+	//Drawing objects
+	sf::RectangleShape buttonRect;
+	sf::RectangleShape innerRect;
+	sf::Text t;
+
+
+	//Rectangle
+	buttonRect.setPosition(btn.left, btn.top);
+	buttonRect.setSize(sf::Vector2f(btn.width, btn.height));
+
+	innerRect.setPosition(btn.left + 2, btn.top + 2);
+	innerRect.setSize(sf::Vector2f(btn.width - 4, btn.height - 4));
+	innerRect.setFillColor(cBtn);
+
+	//Text
+	t.setFont(f);
+	t.setCharacterSize(16);
+	t.setString(str);
+	t.setPosition(btn.left, btn.top);
+
+	//Coloring
+	if (mouseOverButton(btn, w))
+	{
+		if (mouse.isButtonPressed(mouse.Left))
+		{
+			buttonRect.setFillColor(cBtnPress);
+			t.setColor(cTxtPress);
+		}
+
+		else
+		{
+			buttonRect.setFillColor(cBtnHover);
+			t.setColor(cTxtHover);
+		}
+	}
+
+	else
+	{
+		buttonRect.setFillColor(cBtn);
+		t.setColor(cTxt);
+	}
+
+
+
+	//Draw
+	w.draw(buttonRect);
+	w.draw(innerRect);
+	w.draw(t);
+}
+
+void drawMenu(sf::RenderWindow & const w)
+{
+	sf::Color btncol(196, 196, 196, 255);
+	sf::Color tcol(000, 000, 000, 255);
+
+	drawButton(w, btnUCSPF, "UCS");
+	drawButton(w, btnAStar, "A*");
+	drawButton(w, btnPrcmp, "Precomp");
+	drawButton(w, btnRandm, "Random");
+	drawButton(w, btnReset, "Reset");
+}
+
+void drawStatus(sf::RenderWindow & const w, sf::Vector2f pos)
 {
 	sf::Vector2f iPos(pos);
 	sf::Vector2f space(nodeRadius, nodeRadius);
@@ -493,7 +584,7 @@ void drawMenu(sf::RenderWindow & const w, sf::Vector2f pos)
 
 }
 
-bool setNode(GraphType &g, const sf::RenderWindow &w)
+bool setNode(GraphType &g, sf::RenderWindow & const w)
 {
 	bool action = false;
 	int numNodes = g.count();
@@ -531,6 +622,53 @@ bool setNode(GraphType &g, const sf::RenderWindow &w)
 				nEnd = tempNode;
 				action = true;
 			}
+		}
+	}
+
+	return action;
+}
+
+bool clickBtn(const sf::RenderWindow & const w)
+{
+	bool action = false;
+	{
+		if (mouseOverButton(btnUCSPF, w))
+		{
+			if (nStart != NULL && nEnd != NULL)
+			{
+				graph.UCS(nStart, nEnd, empty, path);
+			}
+			action = true;
+		}
+
+		else if (mouseOverButton(btnAStar, w))
+		{
+			if (nStart != NULL && nEnd != NULL)
+			{
+				graph.AStar(nStart, nEnd, empty, path);
+			}
+			action = true;
+		}
+
+		else if (mouseOverButton(btnPrcmp, w))
+		{
+			graph.genMap();
+			action = true;
+		}
+
+		else if (mouseOverButton(btnRandm, w))
+		{
+			//Randomise nodes
+			action = true;
+		}
+
+		else if (mouseOverButton(btnReset, w))
+		{
+			nStart = NULL;
+			nEnd = NULL;
+			path.clear();
+			graph.reset();
+			action = true;
 		}
 	}
 
@@ -632,6 +770,20 @@ int main()
 	cStart = sf::Color(0, 255, 0, 255);
 	cEnd = sf::Color(255, 0, 0, 255);
 
+	//Set up buttons
+	btnUCSPF = sf::FloatRect(600, b.y * 0, 64, b.y);
+	btnAStar = sf::FloatRect(600, b.y * 1.5, 64, b.y);
+	btnPrcmp = sf::FloatRect(600, b.y * 3, 64, b.y);
+	btnRandm = sf::FloatRect(600, b.y * 4.5, 64, b.y);
+	btnReset = sf::FloatRect(600, b.y * 6, 64, b.y);
+
+	cBtn = sf::Color(196, 196, 196, 255);
+	cBtnHover = sf::Color(250, 150, 50, 255);
+	cBtnPress = sf::Color(128, 128, 128, 255);
+	cTxt = sf::Color(0, 0, 0, 255);
+	cTxtHover = sf::Color(0, 255, 255, 255);
+	cTxtPress = sf::Color(255, 255, 255, 255);
+
 	//Set up font sizes & Origin
 	fD = nodeRadius * 2;
 	fG = nodeRadius;
@@ -640,7 +792,6 @@ int main()
 	tOrigin = sf::Vector2f(nodeRadius / 2, nodeRadius + nodeRadius / 2);
 	
 	//Set up graph
-	Graph<char, int> graph(30);
 	loadGraphDrawable(graph, "AStarNodes.txt", "AStarArcs.txt");
 	cout << endl;
 
@@ -649,9 +800,8 @@ int main()
 
 	//Not working? (Q2Nodes and Q2Arcs)
 	//graph.breadthFirstPlus(graph.nodeArray()[0], graph.nodeArray()[15], visit);
-
 	graph.setVerbosity(1);
-	Path path;
+	graph.genMap();
 
 	//UCS broke too fuck (j/k my graph was wrong (AStar Arcs and Nodes))
 	//graph.UCS(graph.nodeArray()[0], graph.nodeArray()[17], visit, path);
@@ -695,7 +845,10 @@ int main()
 		if (mouse.isButtonPressed(mouse.Left))
 		{
 			if (!lMouse)
+			{
 				setNode(graph, window);
+				clickBtn(window);
+			}
 			lMouse = true;
 		}
 
@@ -706,10 +859,6 @@ int main()
 		{
 			if (!mMouse)
 			{
-				nStart = NULL;
-				nEnd = NULL;
-				path.clear();
-				graph.reset();
 			}
 			mMouse = true;
 		}
@@ -721,23 +870,12 @@ int main()
 		{
 			if (!rMouse)
 			{
-				if (nStart != NULL && nEnd != NULL)
-				{
-					if (AStar)
-						//runUCSA(graph, nStart, nEnd);
-						runAStar(graph, nStart, nEnd, path);
-
-					else runUCS(graph, nStart, nEnd, path);
-					//nStart = nEnd = NULL;
-					//outputUCSPathShort(&path);
-				}
 			}
 
 			rMouse = true;
 		}
 
 		else rMouse = false;
-
 
 		// D : Toggle weight drawing
 		if (keyboard.isKeyPressed(keyboard.A))
@@ -794,7 +932,7 @@ int main()
 		else kH = false;
 
 
-		// D : Toggle weight drawing
+		// D : Toggle data drawing
 		if (keyboard.isKeyPressed(keyboard.D))
 		{
 			if (!kD)
@@ -826,7 +964,7 @@ int main()
 		window.clear(cBG);
 		
 		drawGraph(window, graph, &path);
-
+		drawMenu(window);
 		//Pack up menu items
 
 		//drawMenu();
