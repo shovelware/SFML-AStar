@@ -43,7 +43,7 @@ typedef vector<pair<char, HeurVec>> HeurMap;
 ////////////////////////////////////////////////////////////
 ///Global Variables
 //////////////////////////////////////////////////////////// 
-const int screenW = 640;
+const int screenW = 720;
 const int screenH = 480;
 const sf::Mouse mouse;
 const sf::Keyboard keyboard;
@@ -514,7 +514,7 @@ void drawButton(sf::RenderWindow & const w, sf::FloatRect & btn, string str)
 	t.setFont(f);
 	t.setCharacterSize(16);
 	t.setString(str);
-	t.setPosition(btn.left, btn.top);
+	t.setPosition(btn.left + 2, btn.top + 2);
 
 	//Coloring
 	if (mouseOverButton(btn, w))
@@ -552,8 +552,8 @@ void drawMenu(sf::RenderWindow & const w)
 	sf::Color tcol(000, 000, 000, 255);
 
 	drawButton(w, btnUCSPF, "UCS");
-	drawButton(w, btnAStar, "A*");
-	drawButton(w, btnPrcmp, "Precomp");
+	drawButton(w, btnAStar, "AStar");
+	drawButton(w, btnPrcmp, "Map");
 	drawButton(w, btnRandm, "Random");
 	drawButton(w, btnReset, "Reset");
 }
@@ -632,6 +632,7 @@ bool clickBtn(const sf::RenderWindow & const w)
 {
 	bool action = false;
 	{
+		//Run UCS
 		if (mouseOverButton(btnUCSPF, w))
 		{
 			if (nStart != NULL && nEnd != NULL)
@@ -640,7 +641,8 @@ bool clickBtn(const sf::RenderWindow & const w)
 			}
 			action = true;
 		}
-
+		
+		//Run A*
 		else if (mouseOverButton(btnAStar, w))
 		{
 			if (nStart != NULL && nEnd != NULL)
@@ -650,18 +652,27 @@ bool clickBtn(const sf::RenderWindow & const w)
 			action = true;
 		}
 
+		//Precompute paths/run precomputed A*
 		else if (mouseOverButton(btnPrcmp, w))
 		{
-			graph.genMap();
+			if (!graph.hasMap())
+				graph.genMap();
+
+			else if (nStart != NULL && nEnd != NULL)
+			{
+				graph.AStarPre(nStart, nEnd, empty, path);
+			}
 			action = true;
 		}
 
+		//Randomise start and end
 		else if (mouseOverButton(btnRandm, w))
 		{
 			//Randomise nodes
 			action = true;
 		}
 
+		//Clear map
 		else if (mouseOverButton(btnReset, w))
 		{
 			nStart = NULL;
@@ -800,8 +811,8 @@ int main()
 
 	//Not working? (Q2Nodes and Q2Arcs)
 	//graph.breadthFirstPlus(graph.nodeArray()[0], graph.nodeArray()[15], visit);
-	graph.setVerbosity(1);
-	graph.genMap();
+	
+	graph.setVerbosity(2);
 
 	//UCS broke too fuck (j/k my graph was wrong (AStar Arcs and Nodes))
 	//graph.UCS(graph.nodeArray()[0], graph.nodeArray()[17], visit, path);

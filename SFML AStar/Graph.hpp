@@ -29,18 +29,20 @@ private:
 	void gout(int verbosity); //Output function
 
 	//Map of heuristics for this graph
-	HeurMap m_map = NULL; //Map will be null by default
+	HeurMap m_map; //Map will be empty by default
 	float distanceBetween(const sf::Vector2f v1, const sf::Vector2f v2);
 	float mapLookup(Node* pStart, Node* pEnd);
+	void mapNodes(Node* pEnd);
 
 	//Maximum H and G values
 	const int maxG = INT_MAX - 20000;
 	const int maxH = FLT_MAX - 20000;
 
 	//Preparations
-	void prepUCS();
-	void prepAStar();
 	void clearMarks();
+	void clearPrevs();
+	void maxGs();
+	void maxHs();
 
 public:           
     // Constructor and destructor functions
@@ -55,7 +57,7 @@ public:
 	float heurMult() { return m_heurMult; }
 	int verbosity() { return verbosity; }
 	int count() { return m_count; }
-	bool heurMap() {return }
+	bool hasMap() { return !m_map.empty(); }
 
 	// Manipulators
 	void setHeurMult(float HeurMult) { m_heurMult = HeurMult; }
@@ -85,6 +87,7 @@ public:
 	void UCS(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path);
 	void UCSA(Node* pStart, Node* pTarget, void(*pProcess)(Node*));
 	void AStar(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path);
+	void AStarPre(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path);
 };
 
 template<class NodeType, class ArcType>
@@ -128,13 +131,7 @@ Graph<NodeType, ArcType>::~Graph() {
 template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::reset()
 {
-	for (int n = 0; n < m_maxNodes; ++n)
-		if (m_pNodes[n] != 0)
-		{
-			m_pNodes[n]->setG(0);
-			m_pNodes[n]->setH(0);
-			clearMarks();
-		}
+	clearMarks();
 }
 
 template<class NodeType, class ArcType>
@@ -306,8 +303,7 @@ GraphArc<NodeType, ArcType>* Graph<NodeType, ArcType>::getArc( int from, int to 
 template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::clearMarks()
 {
-	int index;
-	for (index = 0; index < m_maxNodes; index++) {
+	for (int index = 0; index < m_maxNodes; ++index) {
 		if (m_pNodes[index] != 0)
 		{
 			m_pNodes[index]->setMarked(false);
@@ -316,49 +312,63 @@ void Graph<NodeType, ArcType>::clearMarks()
 			gout(4);
 		}
 	}
+
+	gop << "Unmarked all nodes" << endl;
+	gout(2);
 }
 
 template<class NodeType, class ArcType>
-void Graph<NodeType, ArcType>::prepUCS()
+void Graph<NodeType, ArcType>::clearPrevs()
 {
-	gop << "=== Prepping UCS ===" << endl;
-	gout(1);
-
-	int index;
-	for (index = 0; index < m_maxNodes; index++) {
-		if (m_pNodes[index] != 0) {
-			m_pNodes[index]->setG(INT_MAX);
-			m_pNodes[index]->setMarked(false);
+	
+	for (int index = 0; index < m_maxNodes; ++index) {
+		if (m_pNodes[index] != 0)
+		{
 			m_pNodes[index]->setPrev(NULL);
 
-			gop << "\t" << m_pNodes[index]->data() << " distance maxed, unmarked and cleared previous." << endl;
+			gop << m_pNodes[index]->data() << " previous cleared." << endl;
 			gout(4);
 		}
 	}
 
-	gop << "=== UCS Prepped ===" << endl << endl;
-	gout(1);
+	gop << "All previous pointers cleared." << endl;
+	gout(2);
 }
 
 template<class NodeType, class ArcType>
-void Graph<NodeType, ArcType>::prepAStar()
+void Graph<NodeType, ArcType>::maxGs()
 {
-	gop << "=== Prepping A* ===" << endl;
-	gout(1);
-	int index;
-	for (index = 0; index < m_maxNodes; index++) {
-		if (m_pNodes[index] != 0) {
-			m_pNodes[index]->setH(FLT_MAX - 1000.0);
-			m_pNodes[index]->setMarked(false);
-			m_pNodes[index]->setPrev(NULL);
 
-			gop << "\t" << m_pNodes[index]->data() << " heuristic maxed, unmarked and cleared previous." << endl;
+	for (int index = 0; index < m_maxNodes; ++index) {
+		if (m_pNodes[index] != 0)
+		{
+			m_pNodes[index]->setG(maxG);
+
+			gop << m_pNodes[index]->data() << " G maxed." << endl;
 			gout(4);
 		}
 	}
 
-	gop << "=== A* Prepped ===" << endl << endl;
-	gout(1);
+	gop << "All G values maxed." << endl;
+	gout(2);
+}
+
+template<class NodeType, class ArcType>
+void Graph<NodeType, ArcType>::maxHs()
+{
+
+	for (int index = 0; index < m_maxNodes; ++index) {
+		if (m_pNodes[index] != 0)
+		{
+			m_pNodes[index]->setH(maxH);
+
+			gop << m_pNodes[index]->data() << " heuristic maxed." << endl;
+			gout(4);
+		}
+	}
+
+	gop << "All heuristic values maxed." << endl;
+	gout(2);
 }
 
 template<class NodeType, class ArcType>
@@ -372,21 +382,24 @@ void Graph<NodeType, ArcType>::genMap()
 {
 	HeurMap map;
 	HeurVec temp;
-
 	Node* nodeI;
 	Node* nodeJ;
 
 	int c = m_count - 1;
+	map.reserve(c);
 
 	//For each node I
 	for (int i = 0; i < c; ++i)
 	{
 		nodeI = m_pNodes[i];
-
+		temp.clear();
+		temp.reserve(c);
+		
 		//For each other node J (including I!)
 		for (int j = 0; j < c; ++j)
 		{
 			nodeJ = m_pNodes[j];
+
 			//Add J and the euclidian distance to it to the map
 			temp.push_back(make_pair(nodeJ->data(), distanceBetween(nodeI->position(), nodeJ->position())));
 		}
@@ -415,15 +428,27 @@ float Graph<NodeType, ArcType>::mapLookup(Node* pStart, Node* pEnd)
 			//Find the second node in heuristic vector for first node
 			for (HeurVec::iterator vIter = mIter->second.begin(), vEnd = mIter->second.end(); vIter < vEnd; ++vIter)
 			{
-				if (vIter->first == pEnd.data())
+				if (vIter->first == pEnd->data())
 				{
-					distance = mIter->second();
+					cout << "DISTANCE" << endl;
+					distance = vIter->second;
 				}
 			}
 		}
 	}
 
 	return distance;
+}
+
+template<class NodeType, class ArcType>
+void Graph<NodeType, ArcType>::mapNodes(Node* pEnd)
+{
+	//lookup pEnd in the map, grab each distance and set it to the appropriate node
+	for (int i = 0, c = m_count - 1; i < c; ++i)
+	{
+		m_pNodes[i]->setH(mapLookup(pEnd, m_pNodes[i]));
+		cout << "Setting " << m_pNodes[i]->data() << " H" << endl;
+	}
 }
 
 // ----------------------------------------------------------------
@@ -568,10 +593,14 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
 	gout(1);
 
-	//init distances and unmark
-	prepUCS();
-	pStart->setG(0);
+	//Unmark and clear Previous
+	clearMarks();
+	clearPrevs();
 
+	//Max distances
+	maxGs();
+
+	pStart->setG(0);
 
 	//make & set up queue
 	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
@@ -675,12 +704,15 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 	gop << "(UCS used to initialise h values)" << endl << endl;
 	gout(1);
 
+	//Max distances
+	maxHs();
 
-	//init distances and unmark
-	prepAStar();
-
-	//Init h by way of UCS
+	//Init path h by way of UCS
 	UCSA(pStart, pTarget, pProcess);
+
+	//Unmark and clear Previous
+	clearMarks();
+	clearPrevs();
 
 	//make & set up queue
 	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
@@ -714,7 +746,7 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 			{
 
 				//Get f of this route (Weight to parent + arc to child + child h to goal)
-				float fn = pq.top()->g() + iter->weight() + childNode->h();
+				float fn = pq.top()->g() + childNode->h();
 
 				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << fn << " < " << (childNode->g()) << "]" << endl;
 
@@ -765,6 +797,105 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 	path.push_back(pTarget);
 
 	std::reverse(path.begin(), path.end());
+}
+
+template<class NodeType, class ArcType>
+void Graph<NodeType, ArcType>::AStarPre(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path)
+{
+
+	gop << "=== Precomputed A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
+
+	//Unmark and clear Previous
+	clearMarks();
+	clearPrevs();
+
+	//Init H Values
+	mapNodes(pTarget);
+
+
+	////make & set up queue
+	//priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
+	//
+	////Clean up after UCSA
+	//pStart->setG(0);
+	//clearMarks();
+	//
+	////Start of UCS
+	//pq.push(pStart);
+	//pStart->setMarked(true);
+	//
+	////Priority Queueue loop
+	//while (!pq.empty() && pq.top() != pTarget)
+	//{
+	//
+	//	gop << "TOP: " << pq.top()->data() << endl;
+	//
+	//	//for each child node
+	//	list<Arc>::const_iterator iter = pq.top()->arcList().begin();
+	//	list<Arc>::const_iterator endIter = pq.top()->arcList().end();
+	//
+	//	//Process all children of the top node
+	//	for (; iter != endIter; iter++)
+	//	{
+	//		//Pull out the node to test
+	//		Node * childNode = iter->node();
+	//
+	//		//if the previous node is not top of the queue & Not marked
+	//		if (childNode != pq.top()->getPrev() && !childNode->marked())
+	//		{
+	//
+	//			//Get f of this route (Weight to parent + arc to child + child h to goal)
+	//			float fn = pq.top()->g() + childNode->h();
+	//
+	//			gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << fn << " < " << (childNode->g()) << "]" << endl;
+	//
+	//			//if it's lower than the weight of the current route
+	//			if (fn < (childNode->g()))
+	//			{
+	//				//Set the node's internal weight to the arc from previous plus internal weight of previous
+	//				childNode->setG(fn);
+	//				//Set previous pointer of the node to the previous node in the new path
+	//				childNode->setPrev(pq.top());
+	//
+	//				gop << "\t\t" << "True, " << childNode->data() << " weight is now " << fn << ", previous is now " << pq.top()->data() << endl;
+	//			}
+	//
+	//			else
+	//			{
+	//				if (childNode->getPrev() != 0)
+	//					gop << "\t\t" << "False, " << childNode->data() << " remaining " << (childNode->g()) << ", previous remains " << childNode->getPrev()->data() << endl;
+	//				else gop << "\t\t" << "False, " << childNode->data() << " remaining " << (childNode->g()) << ", previous remains NULL" << endl;
+	//			}
+	//
+	//			//if not marked
+	//			if (childNode->marked() == false) {
+	//				//add it to the queue and mark
+	//				pq.push(childNode);
+	//				gop << "Queueing:  " << childNode->data() << endl;
+	//				childNode->setMarked(true);
+	//			}
+	//		}
+	//	}
+	//	gop << "Popping: " << pq.top()->data() << endl << endl;
+	//	gout(2);
+	//
+	//	make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
+	//	pq.pop();
+	//}
+	//
+	//gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " completed ===" << endl;
+	//gout(1);
+	//
+	////Add the nodes to path
+	//path.clear();
+	//while (pTarget->getPrev() != NULL)
+	//{
+	//	path.push_back(pTarget);
+	//	pTarget = pTarget->getPrev();
+	//}
+	//path.push_back(pTarget);
+	//
+	//std::reverse(path.begin(), path.end());
 }
 
 template<class NodeType, class ArcType>
