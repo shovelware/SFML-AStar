@@ -75,7 +75,7 @@ Node* nEnd;
 
 //Maximum values
 const int maxG = INT_MAX - 20000;
-const int maxH = FLT_MAX - 20000;
+const float maxH = FLT_MAX - 20000;
 
 //Bools for toggling drawing of graph data
 bool drawD = 1;
@@ -961,7 +961,7 @@ int main()
 		{
 			if (!kSpace)
 			{
-				PrayThisWorks(graph, path);
+				//PrayThisWorks(graph, path);
 			}
 
 			kSpace = true;

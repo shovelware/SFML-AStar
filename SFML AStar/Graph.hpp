@@ -132,6 +132,8 @@ template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::reset()
 {
 	clearMarks();
+	maxGs();
+	maxHs();
 }
 
 template<class NodeType, class ArcType>
@@ -443,11 +445,11 @@ float Graph<NodeType, ArcType>::mapLookup(Node* pStart, Node* pEnd)
 template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::mapNodes(Node* pEnd)
 {
+	float distance;
 	//lookup pEnd in the map, grab each distance and set it to the appropriate node
 	for (int i = 0, c = m_count - 1; i < c; ++i)
 	{
 		m_pNodes[i]->setH(mapLookup(pEnd, m_pNodes[i]));
-		cout << "Setting " << m_pNodes[i]->data() << " H" << endl;
 	}
 }
 
@@ -745,13 +747,14 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 			if (childNode != pq.top()->getPrev() && !childNode->marked())
 			{
 
-				//Get f of this route (Weight to parent + arc to child + child h to goal)
-				float fn = pq.top()->g() + childNode->h();
+				//Get f of this route (Weight to parent + arc to child)
+				float route = pq.top()->g() + iter->weight();
+				float fn = route + childNode->h();
 
 				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << fn << " < " << (childNode->g()) << "]" << endl;
 
 				//if it's lower than the weight of the current route
-				if (fn < (childNode->g()))
+				if (fn < (childNode->g() + childNode->h()))
 				{
 					//Set the node's internal weight to the arc from previous plus internal weight of previous
 					childNode->setG(fn);
