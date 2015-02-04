@@ -9,7 +9,7 @@ using namespace std;
 
 template <class NodeType, class ArcType> class GraphArc;
 template <class NodeType, class ArcType> class GraphNode;
-typedef vector<pair<char, float>> HeurVec;
+typedef vector<pair<char, int>> HeurVec;
 typedef vector<pair<char, HeurVec>> HeurMap;
 
 template<class NodeType, class ArcType>
@@ -36,7 +36,7 @@ private:
 
 	//Maximum H and G values
 	const int maxG = INT_MAX - 20000;
-	const int maxH = FLT_MAX - 20000;
+	const int maxH = INT_MAX - 20000;
 
 	//Preparations
 	void clearMarks();
@@ -387,7 +387,7 @@ void Graph<NodeType, ArcType>::genMap()
 	Node* nodeI;
 	Node* nodeJ;
 
-	int c = m_count - 1;
+	int c = m_count;
 	map.reserve(c);
 
 	//For each node I
@@ -432,7 +432,6 @@ float Graph<NodeType, ArcType>::mapLookup(Node* pStart, Node* pEnd)
 			{
 				if (vIter->first == pEnd->data())
 				{
-					cout << "DISTANCE" << endl;
 					distance = vIter->second;
 				}
 			}
@@ -447,7 +446,7 @@ void Graph<NodeType, ArcType>::mapNodes(Node* pEnd)
 {
 	float distance;
 	//lookup pEnd in the map, grab each distance and set it to the appropriate node
-	for (int i = 0, c = m_count - 1; i < c; ++i)
+	for (int i = 0, c = m_count; i < c; ++i)
 	{
 		m_pNodes[i]->setH(mapLookup(pEnd, m_pNodes[i]));
 	}
@@ -595,21 +594,18 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
 	gout(1);
 
-	//Unmark and clear Previous
+	//Unmark, clear Prev, max G, set up first node
 	clearMarks();
 	clearPrevs();
-
-	//Max distances
 	maxGs();
-
 	pStart->setG(0);
+	pStart->setMarked(true);
 
 	//make & set up queue
 	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
 	
 	//Start of UCS
 	pq.push(pStart);
-	pStart->setMarked(true);
 	
 	//Priority Queueue loop
 	while (!pq.empty() && pq.top() != pTarget)
@@ -631,7 +627,7 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 			if (childNode != pq.top()->getPrev())
 			{
 				//Get total weight of this route
-				int c = pq.top()->getArc(childNode)->weight() + pq.top()->g();
+				int c = pq.top()->g() + iter->weight();
 
 				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << c << " < " << (childNode->g()) << "]" << endl;
 
@@ -667,8 +663,11 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 		gop << "Popping: " << pq.top()->data() << endl << endl;
 		gout(2);
 
-		make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
 		pq.pop();
+
+		if (!pq.empty())
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
+		
 	}
 	
 	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " complete. ===" << endl << endl;
@@ -706,26 +705,24 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 	gop << "(UCS used to initialise h values)" << endl << endl;
 	gout(1);
 
-	//Max distances
+	//Max other distances
 	maxHs();
 
 	//Init path h by way of UCS
 	UCSA(pStart, pTarget, pProcess);
 
-	//Unmark and clear Previous
-	clearMarks();
-	clearPrevs();
-
 	//make & set up queue
 	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
 
-	//Clean up after UCSA
-	pStart->setG(0);
+	//Unmark, clear Prev, max G, set up first node
 	clearMarks();
-
-	//Start of UCS
-	pq.push(pStart);
+	clearPrevs();
+	maxGs();
+	pStart->setG(0);
 	pStart->setMarked(true);
+
+	//Start of A*
+	pq.push(pStart);
 
 	//Priority Queueue loop
 	while (!pq.empty() && pq.top() != pTarget)
@@ -748,16 +745,15 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 			{
 
 				//Get f of this route (Weight to parent + arc to child)
-				float route = pq.top()->g() + iter->weight();
-				float fn = route + childNode->h();
+				float fn = pq.top()->g() + iter->weight();
 
 				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << fn << " < " << (childNode->g()) << "]" << endl;
 
 				//if it's lower than the weight of the current route
-				if (fn < (childNode->g() + childNode->h()))
+				if (fn < childNode->g())
 				{
 					//Set the node's internal weight to the arc from previous plus internal weight of previous
-					childNode->setG(fn);
+					childNode->setG(fn + childNode->h());
 					//Set previous pointer of the node to the previous node in the new path
 					childNode->setPrev(pq.top());
 
@@ -783,8 +779,10 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 		gop << "Popping: " << pq.top()->data() << endl << endl;
 		gout(2);
 
-		make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
 		pq.pop();
+
+		if (!pq.empty())
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
 	}
 
 	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " completed ===" << endl;
@@ -807,98 +805,98 @@ void Graph<NodeType, ArcType>::AStarPre(Node* pStart, Node* pTarget, void(*pProc
 {
 
 	gop << "=== Precomputed A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
-
-	//Unmark and clear Previous
-	clearMarks();
-	clearPrevs();
+	
 
 	//Init H Values
 	mapNodes(pTarget);
+	
+	//make & set up queue
+	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
 
+	//Unmark, clear Prev, max G, set up first node
+	clearMarks();
+	clearPrevs();
+	maxGs();
+	pStart->setG(0);
+	pStart->setMarked(true);
 
-	////make & set up queue
-	//priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
-	//
-	////Clean up after UCSA
-	//pStart->setG(0);
-	//clearMarks();
-	//
-	////Start of UCS
-	//pq.push(pStart);
-	//pStart->setMarked(true);
-	//
-	////Priority Queueue loop
-	//while (!pq.empty() && pq.top() != pTarget)
-	//{
-	//
-	//	gop << "TOP: " << pq.top()->data() << endl;
-	//
-	//	//for each child node
-	//	list<Arc>::const_iterator iter = pq.top()->arcList().begin();
-	//	list<Arc>::const_iterator endIter = pq.top()->arcList().end();
-	//
-	//	//Process all children of the top node
-	//	for (; iter != endIter; iter++)
-	//	{
-	//		//Pull out the node to test
-	//		Node * childNode = iter->node();
-	//
-	//		//if the previous node is not top of the queue & Not marked
-	//		if (childNode != pq.top()->getPrev() && !childNode->marked())
-	//		{
-	//
-	//			//Get f of this route (Weight to parent + arc to child + child h to goal)
-	//			float fn = pq.top()->g() + childNode->h();
-	//
-	//			gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << fn << " < " << (childNode->g()) << "]" << endl;
-	//
-	//			//if it's lower than the weight of the current route
-	//			if (fn < (childNode->g()))
-	//			{
-	//				//Set the node's internal weight to the arc from previous plus internal weight of previous
-	//				childNode->setG(fn);
-	//				//Set previous pointer of the node to the previous node in the new path
-	//				childNode->setPrev(pq.top());
-	//
-	//				gop << "\t\t" << "True, " << childNode->data() << " weight is now " << fn << ", previous is now " << pq.top()->data() << endl;
-	//			}
-	//
-	//			else
-	//			{
-	//				if (childNode->getPrev() != 0)
-	//					gop << "\t\t" << "False, " << childNode->data() << " remaining " << (childNode->g()) << ", previous remains " << childNode->getPrev()->data() << endl;
-	//				else gop << "\t\t" << "False, " << childNode->data() << " remaining " << (childNode->g()) << ", previous remains NULL" << endl;
-	//			}
-	//
-	//			//if not marked
-	//			if (childNode->marked() == false) {
-	//				//add it to the queue and mark
-	//				pq.push(childNode);
-	//				gop << "Queueing:  " << childNode->data() << endl;
-	//				childNode->setMarked(true);
-	//			}
-	//		}
-	//	}
-	//	gop << "Popping: " << pq.top()->data() << endl << endl;
-	//	gout(2);
-	//
-	//	make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
-	//	pq.pop();
-	//}
-	//
-	//gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " completed ===" << endl;
-	//gout(1);
-	//
-	////Add the nodes to path
-	//path.clear();
-	//while (pTarget->getPrev() != NULL)
-	//{
-	//	path.push_back(pTarget);
-	//	pTarget = pTarget->getPrev();
-	//}
-	//path.push_back(pTarget);
-	//
-	//std::reverse(path.begin(), path.end());
+	//Start of A*
+	pq.push(pStart);
+
+	//Priority Queueue loop
+	while (!pq.empty() && pq.top() != pTarget)
+	{
+
+		gop << "TOP: " << pq.top()->data() << endl;
+
+		//for each child node
+		list<Arc>::const_iterator iter = pq.top()->arcList().begin();
+		list<Arc>::const_iterator endIter = pq.top()->arcList().end();
+
+		//Process all children of the top node
+		for (; iter != endIter; iter++)
+		{
+			//Pull out the node to test
+			Node * childNode = iter->node();
+
+			//if the previous node is not top of the queue & Not marked
+			if (childNode != pq.top()->getPrev() && !childNode->marked())
+			{
+
+				//Get f of this route (Weight to parent + arc to child)
+				float fn = pq.top()->g() + iter->weight();
+
+				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << fn << " < " << (childNode->g()) << "]" << endl;
+
+				//if it's lower than the weight of the current route
+				if (fn < childNode->g())
+				{
+					//Set the node's internal weight to the arc from previous plus internal weight of previous
+					childNode->setG(fn + childNode->h());
+					//Set previous pointer of the node to the previous node in the new path
+					childNode->setPrev(pq.top());
+
+					gop << "\t\t" << "True, " << childNode->data() << " weight is now " << fn << ", previous is now " << pq.top()->data() << endl;
+				}
+
+				else
+				{
+					if (childNode->getPrev() != 0)
+						gop << "\t\t" << "False, " << childNode->data() << " remaining " << (childNode->g()) << ", previous remains " << childNode->getPrev()->data() << endl;
+					else gop << "\t\t" << "False, " << childNode->data() << " remaining " << (childNode->g()) << ", previous remains NULL" << endl;
+				}
+
+				//if not marked
+				if (childNode->marked() == false) {
+					//add it to the queue and mark
+					pq.push(childNode);
+					gop << "Queueing:  " << childNode->data() << endl;
+					childNode->setMarked(true);
+				}
+			}
+		}
+		gop << "Popping: " << pq.top()->data() << endl << endl;
+		gout(2);
+
+		pq.pop();
+
+		if (!pq.empty())
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
+	}
+	
+	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " completed ===" << endl;
+	gout(1);
+	
+	//Add the nodes to path
+	path.clear();
+	while (pTarget->getPrev() != NULL)
+	{
+		path.push_back(pTarget);
+		pTarget = pTarget->getPrev();
+	}
+	path.push_back(pTarget);
+	
+	std::reverse(path.begin(), path.end());
 }
 
 template<class NodeType, class ArcType>

@@ -20,7 +20,7 @@ typedef GraphNode<NodeType, ArcType> Node;
 	Node* m_prevNode;
     bool m_marked;
 	ArcType m_g; //Actual distance, used for UCS and A*
-	float m_h; //Heuristic, used for A*
+	int m_h; //Heuristic, used for A*
 	sf::Vector2f m_pos; //Position, used for drawing
 
 public:
@@ -32,7 +32,7 @@ public:
     bool marked() const { return m_marked; }
 	NodeType const & data() const { return m_data; }
 	ArcType const & g() const { return m_g; }
-	float const & h() const { return m_h; }
+	int const & h() const { return m_h; }
 	sf::Vector2f const & position() const { return m_pos; }
 	
     // Manipulator functions

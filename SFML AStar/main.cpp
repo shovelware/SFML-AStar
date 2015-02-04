@@ -24,6 +24,7 @@
 #include <list>
 
 #include "Graph.hpp"
+#include <time.h>
 
 using std::cout;
 using std::endl;
@@ -36,7 +37,7 @@ typedef GraphNode<char, int> Node;
 typedef vector<Node*> Path;
 
 //Vector of <endNode, heuristic>
-typedef vector<pair<char, float>> HeurVec;
+typedef vector<pair<char, int>> HeurVec;
 //Heuristic map is a vector<startNode, vector<endNode, heuristic>>
 typedef vector<pair<char, HeurVec>> HeurMap;
 
@@ -75,7 +76,8 @@ Node* nEnd;
 
 //Maximum values
 const int maxG = INT_MAX - 20000;
-const float maxH = FLT_MAX - 20000;
+const float maxH = INT_MAX - 20000;
+const string maxstr = "X";
 
 //Bools for toggling drawing of graph data
 bool drawD = 1;
@@ -83,10 +85,6 @@ bool drawG = 1;
 bool drawH = 1;
 bool drawW = 1;
 
-//Bools 
-bool AStar = 0;
-
-int menuItems = 5;
 ////////////////////////////////////////////////////////////
 ///Functions
 //////////////////////////////////////////////////////////// 
@@ -446,7 +444,7 @@ void drawNodes(sf::RenderWindow & const w, GraphType & const g, Path & p)
 			int g = tempNode->g();
 			if (g >= maxG)
 			{
-				t.setString("MAX");
+				t.setString(maxstr);
 			}
 
 			else t.setString(numToStr(g));
@@ -459,12 +457,12 @@ void drawNodes(sf::RenderWindow & const w, GraphType & const g, Path & p)
 		if (drawH)
 		{
 			t.setCharacterSize(fH);
-			t.setPosition((tempNode->position() + b) + sf::Vector2f(nodeRadius * 2, nodeRadius * 2));
+			t.setPosition((tempNode->position() + b) + sf::Vector2f(nodeRadius * 1.5, nodeRadius * 2));
 
 			float h = tempNode->h();
 			if (h >= maxH)
 			{
-				t.setString("MAX");
+				t.setString(maxstr);
 			}
 
 			else t.setString(numToStr(tempNode->h()));
@@ -669,16 +667,27 @@ bool clickBtn(const sf::RenderWindow & const w)
 		else if (mouseOverButton(btnRandm, w))
 		{
 			//Randomise nodes
+			nStart = graph.nodeArray()[rand() % graph.count()];
+			nEnd = graph.nodeArray()[rand() % graph.count()];
+			path.clear();
+
 			action = true;
 		}
 
 		//Clear map
 		else if (mouseOverButton(btnReset, w))
 		{
-			nStart = NULL;
-			nEnd = NULL;
-			path.clear();
-			graph.reset();
+			if (path.empty())
+			{
+				nStart = NULL;
+				nEnd = NULL;
+			}
+
+			else
+			{
+				path.clear();
+				graph.reset();
+			}
 			action = true;
 		}
 	}
@@ -763,6 +772,9 @@ int main()
 	// Create the main window 
 	sf::RenderWindow window(sf::VideoMode(screenW, screenH, 32), "SFML A*");
 
+	//Seed random
+	srand(time(NULL));
+
 	//Set up assets & drawing stuff
 	f.loadFromFile("FORCED SQUARE.ttf");
 
@@ -806,19 +818,8 @@ int main()
 	loadGraphDrawable(graph, "AStarNodes.txt", "AStarArcs.txt");
 	cout << endl;
 
-	//Working (Any graph)
-	//graph.breadthFirst(graph.nodeArray()[0], visit);
+	graph.setVerbosity(1);
 
-	//Not working? (Q2Nodes and Q2Arcs)
-	//graph.breadthFirstPlus(graph.nodeArray()[0], graph.nodeArray()[15], visit);
-	
-	graph.setVerbosity(2);
-
-	//UCS broke too fuck (j/k my graph was wrong (AStar Arcs and Nodes))
-	//graph.UCS(graph.nodeArray()[0], graph.nodeArray()[17], visit, path);
-	//outputUCSPathShort(&path);
-
-	//Who the hell knows about A*
 
 	// Start game loop 
 	while (window.isOpen())
@@ -865,7 +866,7 @@ int main()
 
 		else lMouse = false;
 		
-		// Middle Mouse : Clear everything
+		// Middle Mouse :
 		if (mouse.isButtonPressed(mouse.Middle))
 		{
 			if (!mMouse)
@@ -876,7 +877,7 @@ int main()
 
 		else mMouse = false;
 
-		// Right Mouse : Run Pathfinding
+		// Right Mouse :
 		if (mouse.isButtonPressed(mouse.Right))
 		{
 			if (!rMouse)
@@ -888,12 +889,11 @@ int main()
 
 		else rMouse = false;
 
-		// D : Toggle weight drawing
+		// A : Toggle
 		if (keyboard.isKeyPressed(keyboard.A))
 		{
 			if (!kA)
 			{
-				AStar = !AStar;
 			}
 
 			kA = true;
@@ -976,10 +976,6 @@ int main()
 		
 		drawGraph(window, graph, &path);
 		drawMenu(window);
-		//Pack up menu items
-
-		//drawMenu();
-
 		window.display();
 
 	}
