@@ -62,10 +62,11 @@ sf::Vector2f tOrigin;
 
 //Buttons
 sf::FloatRect btnUCSPF;
-sf::FloatRect btnPrcmp;
 sf::FloatRect btnAStar;
-sf::FloatRect btnReset;
+sf::FloatRect btnPrcmp;
 sf::FloatRect btnRandm;
+sf::FloatRect btnSwaps;
+sf::FloatRect btnReset;
 sf::Color cBtn, cBtnHover, cBtnPress, cTxt, cTxtHover, cTxtPress;
 
 //Graph, path, start and end nodes
@@ -552,6 +553,7 @@ void drawMenu(sf::RenderWindow & const w)
 	drawButton(w, btnUCSPF, "UCS");
 	drawButton(w, btnAStar, "AStar");
 	drawButton(w, btnPrcmp, "Map");
+	drawButton(w, btnSwaps, "Swap");
 	drawButton(w, btnRandm, "Random");
 	drawButton(w, btnReset, "Reset");
 }
@@ -635,7 +637,7 @@ bool clickBtn(const sf::RenderWindow & const w)
 		{
 			if (nStart != NULL && nEnd != NULL)
 			{
-				graph.UCS(nStart, nEnd, empty, path);
+				graph.UCS(nStart, nEnd, path);
 			}
 			action = true;
 		}
@@ -645,7 +647,7 @@ bool clickBtn(const sf::RenderWindow & const w)
 		{
 			if (nStart != NULL && nEnd != NULL)
 			{
-				graph.AStar(nStart, nEnd, empty, path);
+				graph.AStar(nStart, nEnd, path);
 			}
 			action = true;
 		}
@@ -658,8 +660,23 @@ bool clickBtn(const sf::RenderWindow & const w)
 
 			else if (nStart != NULL && nEnd != NULL)
 			{
-				graph.AStarPre(nStart, nEnd, empty, path);
+				graph.AStarPre(nStart, nEnd, path);
 			}
+			action = true;
+		}
+
+		//Switch start and end
+		else if (mouseOverButton(btnSwaps, w))
+		{
+			//Switch nodes
+			Node* temp = nStart;
+			nStart = nEnd;
+			nEnd = temp;
+
+			//Clean up
+			path.clear();
+			graph.reset();
+
 			action = true;
 		}
 
@@ -669,7 +686,10 @@ bool clickBtn(const sf::RenderWindow & const w)
 			//Randomise nodes
 			nStart = graph.nodeArray()[rand() % graph.count()];
 			nEnd = graph.nodeArray()[rand() % graph.count()];
+
+			//Clean up
 			path.clear();
+			graph.reset();
 
 			action = true;
 		}
@@ -718,7 +738,7 @@ bool runUCS(GraphType & g, Node* n1, Node* n2, Path & p)
 {
 	if (n1 != NULL && n2 != NULL)
 	{
-		g.UCS(n1, n2, empty, p);
+		g.UCS(n1, n2, p);
 		return true;
 	}
 
@@ -729,7 +749,7 @@ bool runUCSA(GraphType & g, Node* n1, Node * n2)
 {
 	if (n1 != NULL && n2 != NULL)
 	{
-		g.UCSA(n1, n2, empty);
+		g.UCSA(n1, n2);
 		return true;
 	}
 
@@ -740,7 +760,7 @@ bool runAStar(GraphType & g, Node* n1, Node* n2, Path & p)
 {
 	if (n1 != NULL && n2 != NULL)
 	{
-		g.AStar(n1, n2, empty, p);
+		g.AStar(n1, n2, p);
 		return true;
 	}
 
@@ -794,11 +814,13 @@ int main()
 	cEnd = sf::Color(255, 0, 0, 255);
 
 	//Set up buttons
-	btnUCSPF = sf::FloatRect(600, b.y * 0, 64, b.y);
-	btnAStar = sf::FloatRect(600, b.y * 1.5, 64, b.y);
-	btnPrcmp = sf::FloatRect(600, b.y * 3, 64, b.y);
-	btnRandm = sf::FloatRect(600, b.y * 4.5, 64, b.y);
-	btnReset = sf::FloatRect(600, b.y * 6, 64, b.y);
+	btnUCSPF = sf::FloatRect(560, b.y * 0, 64, b.y);
+	btnAStar = sf::FloatRect(560, b.y * 1.5, 64, b.y);
+	btnPrcmp = sf::FloatRect(560, b.y * 3, 64, b.y);
+
+	btnSwaps = sf::FloatRect(640, b.y * 0, 64, b.y);
+	btnRandm = sf::FloatRect(640, b.y * 1.5, 64, b.y);
+	btnReset = sf::FloatRect(640, b.y * 3, 64, b.y);
 
 	cBtn = sf::Color(196, 196, 196, 255);
 	cBtnHover = sf::Color(250, 150, 50, 255);

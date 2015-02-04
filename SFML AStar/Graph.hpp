@@ -84,10 +84,10 @@ public:
     void depthFirst( Node* pNode, void (*pProcess)(Node*) );
 	void breadthFirst(Node* pNode, void(*pProcess)(Node*));
 	void breadthFirstPlus(Node* pNode, Node* pTarget, void(*pProcess)(Node*));
-	void UCS(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path);
-	void UCSA(Node* pStart, Node* pTarget, void(*pProcess)(Node*));
-	void AStar(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path);
-	void AStarPre(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path);
+	void UCS(Node* pStart, Node* pTarget, std::vector<Node*>& path);
+	void UCSA(Node* pStart, Node* pTarget);
+	void AStar(Node* pStart, Node* pTarget, std::vector<Node*>& path);
+	void AStarPre(Node* pStart, Node* pTarget, std::vector<Node*>& path);
 };
 
 template<class NodeType, class ArcType>
@@ -589,7 +589,7 @@ void Graph<NodeType, ArcType>::breadthFirstPlus(Node* pNode, Node* pTarget, void
 }
 
 template<class NodeType, class ArcType>
-void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path)
+void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, std::vector<Node*>& path)
 {
 	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
 	gout(1);
@@ -686,10 +686,10 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, void(*pProcess)(
 }
 
 template<class NodeType, class ArcType>
-void Graph<NodeType, ArcType>::UCSA(Node* pStart, Node* pTarget, void(*pProcess)(Node*))
+void Graph<NodeType, ArcType>::UCSA(Node* pStart, Node* pTarget)
 {
 	vector<Node*> UCSP;
-	UCS(pTarget, pStart, pProcess, UCSP);
+	UCS(pTarget, pStart, UCSP);
 
 	//Walk back through the path and set h values to 90% of distance to goal
 	for (vector<Node*>::iterator vIter = UCSP.begin(), vEnd = UCSP.end(); vIter < vEnd; vIter++)
@@ -699,7 +699,7 @@ void Graph<NodeType, ArcType>::UCSA(Node* pStart, Node* pTarget, void(*pProcess)
 }
 
 template<class NodeType, class ArcType>
-void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path)
+void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<Node*>& path)
 {
 	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
 	gop << "(UCS used to initialise h values)" << endl << endl;
@@ -709,7 +709,7 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 	maxHs();
 
 	//Init path h by way of UCS
-	UCSA(pStart, pTarget, pProcess);
+	UCSA(pStart, pTarget);
 
 	//make & set up queue
 	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
@@ -801,7 +801,7 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, void(*pProcess
 }
 
 template<class NodeType, class ArcType>
-void Graph<NodeType, ArcType>::AStarPre(Node* pStart, Node* pTarget, void(*pProcess)(Node*), std::vector<Node*>& path)
+void Graph<NodeType, ArcType>::AStarPre(Node* pStart, Node* pTarget, std::vector<Node*>& path)
 {
 
 	gop << "=== Precomputed A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
