@@ -38,7 +38,6 @@ private:
 	HeurMap m_map; //Map will be empty by default
 	float distanceBetween(const sf::Vector2f v1, const sf::Vector2f v2);
 	float mapLookup(Node* pStart, Node* pEnd);
-	void mapNodes(Node* pEnd);
 
 	//Maximum H and G values
 	const int maxG = INT_MAX - 20000;
@@ -85,6 +84,7 @@ public:
 
 	//Mapping
 	void genMap();
+	void mapNodes(Node* pEnd);
 
 	//Graph exercises
     void depthFirst( Node* pNode, void (*pProcess)(Node*) );
@@ -597,7 +597,7 @@ void Graph<NodeType, ArcType>::breadthFirstPlus(Node* pNode, Node* pTarget, void
 template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, std::vector<Node*>& path)
 {
-	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
+	gop << "\a=== UCS from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
 	gout(2);
 
 	//Start timer
@@ -623,12 +623,8 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, std::vector<Node
 
 		gop << "TOP: " << pq.top()->data() << endl;
 
-		//for each child node
-		list<Arc>::const_iterator iter = pq.top()->arcList().begin();
-		list<Arc>::const_iterator endIter = pq.top()->arcList().end();
-	
-		//Process all children of the top node
-		for (; iter != endIter; iter++) 
+		//for each arc
+		for (list<Arc>::const_iterator iter = pq.top()->arcList().begin(), endIter = pq.top()->arcList().end(); iter != endIter; ++iter)
 		{
 			//Pull out the node to test
 			Node* childNode = iter->node();
@@ -651,7 +647,6 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, std::vector<Node
 					childNode->setPrev(pq.top());
 
 					gop << "\t\t" << "True, " << childNode->data() << " g is now " << c << ", previous is now " << pq.top()->data() << endl;
-
 				}
 
 				else
@@ -684,7 +679,7 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, std::vector<Node
 	end = std::chrono::system_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end - start;
 
-	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " complete. (" << elapsed_seconds.count() << "s)===" << endl << endl;
+	gop << "\a\a=== UCS from " << pStart->data() << " to " << pTarget->data() << " complete. (" << elapsed_seconds.count() << "s)===" << endl << endl;
 	gout(1);
 
 	//Add the nodes to path
@@ -701,72 +696,112 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, std::vector<Node
 
 template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::InitAStar(Node* pTarget)
-{
-	//Turn off output so we don't spam the user
-	int tempverb = m_verbosity;
-	m_verbosity = 0;
+{	
+	//Unmark, clear prev, max G, set up first node
+	clearMarks();
+	clearPrevs();
+	maxGs();
+	pTarget->setG(0);
+	pTarget->setMarked(true);
 
-	//Set all h values
+	//Set up queue
+	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
+	pq.push(pTarget);
 
-	//Set output to user's desired level
-	m_verbosity = tempverb;
+	//Priority Queue loop
+	while (!pq.empty() && pTarget != NULL)
+	{
+		//for each arc
+		for (list<Arc>::const_iterator iter = pq.top()->arcList().begin(),  endIter = pq.top()->arcList().end(); iter != endIter; ++iter)
+		{
+			//pull out the node to test
+			Node* childNode = iter->node();
+
+			//If the previous node is not top of the queue
+			if (childNode != pq.top()->getPrev())
+			{
+				//Get total weight of this route
+				int c = pq.top()->g() + iter->weight();
+
+				//if it's lower than the current weight
+				if (c < childNode->g())
+				{
+					//set internal weight to route weight
+					childNode->setG(c);
+				}
+
+				//if not marked
+				if (childNode->marked() == false)
+				{
+					//add it to the queue and unmark
+					pq.push(childNode);
+					childNode->setMarked(true);
+				}
+			}
+		}
+
+		//Set heuristic using multiplier
+		pq.top()->setH((pq.top()->g() * m_heurMult));
+
+		pq.pop();
+
+		if (!pq.empty())
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), class NodeSearchCostComparer<NodeType, ArcType>());
+
+	}
 }
 
 template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<Node*>& path)
 {
-	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
-	gop << "(UCS used to initialise h values)" << endl << endl;
+	gop << "\a=== A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
 	gout(2);
 
 	//Start timer
 	std::chrono::time_point<std::chrono::system_clock> start, end;
 	start = std::chrono::system_clock::now();
 
-	//Max other distances
-	maxHs();
-
 	//Init path h by way of UCS
 	InitAStar(pTarget);
 
 	//make & set up queue
 	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
-
+	
 	//Unmark, clear Prev, max G, set up first node
 	clearMarks();
 	clearPrevs();
 	maxGs();
 	pStart->setG(0);
 	pStart->setMarked(true);
-
+	
 	//Start of A*
 	pq.push(pStart);
-
+	
 	//Priority Queueue loop
 	while (!pq.empty() && pq.top() != pTarget)
 	{
-
+	
 		gop << "TOP: " << pq.top()->data() << endl;
-
+	
 		//for each child node
 		list<Arc>::const_iterator iter = pq.top()->arcList().begin();
 		list<Arc>::const_iterator endIter = pq.top()->arcList().end();
-
+	
 		//Process all children of the top node
 		for (; iter != endIter; iter++) 
 		{
 			//Pull out the node to test
 			Node * childNode = iter->node();
-
+	
 			//if the previous node is not top of the queue & Not marked
 			if (childNode != pq.top()->getPrev() && !childNode->marked())
 			{
-
+	
 				//Get f of this route (Weight to parent + arc to child)
 				float fn = pq.top()->g() + iter->weight();
-
+	
 				gop << "\t" << "Checking: " << pq.top()->data() << " -> " << childNode->data() << " [" << fn << " < " << (childNode->g()) << "]" << endl;
-
+	
 				//if it's lower than the weight of the current route
 				if (fn < childNode->g())
 				{
@@ -774,10 +809,10 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<No
 					childNode->setG(fn + childNode->h());
 					//Set previous pointer of the node to the previous node in the new path
 					childNode->setPrev(pq.top());
-
+	
 					gop << "\t\t" << "True, " << childNode->data() << " weight is now " << fn << ", previous is now " << pq.top()->data() << endl;
 				}
-
+	
 				else
 				{
 					if (childNode->getPrev() != 0)
@@ -796,20 +831,20 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<No
 		}
 		gop << "Popping: " << pq.top()->data() << endl << endl;
 		gout(2);
-
+	
 		pq.pop();
-
+	
 		if (!pq.empty())
 			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
 	}
-
+	
 	//End timer
 	end = std::chrono::system_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end - start;
-
-	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " complete. (" << elapsed_seconds.count() << "s)===" << endl << endl;
+	
+	gop << "\a\a=== A* from " << pStart->data() << " to " << pTarget->data() << " complete. (" << elapsed_seconds.count() << "s)===" << endl << endl;
 	gout(1);
-
+	
 	//Add the nodes to path
 	path.clear();
 	while (pTarget->getPrev() != NULL)
@@ -818,7 +853,7 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<No
 		pTarget = pTarget->getPrev();
 	}
 	path.push_back(pTarget);
-
+	
 	std::reverse(path.begin(), path.end());
 }
 
@@ -826,7 +861,7 @@ template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::AStarPrecomp(Node* pStart, Node* pTarget, std::vector<Node*>& path)
 {
 
-	gop << "=== Precomputed A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
+	gop << "\a=== Precomputed A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
 	gout(2);
 
 	//Start timer
@@ -914,7 +949,7 @@ void Graph<NodeType, ArcType>::AStarPrecomp(Node* pStart, Node* pTarget, std::ve
 	end = std::chrono::system_clock::now();
 	std::chrono::duration<double> elapsed_seconds = end - start;
 
-	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " complete. (" << elapsed_seconds.count() << "s)===" << endl << endl;
+	gop << "\a\a=== A* from " << pStart->data() << " to " << pTarget->data() << " complete. (" << elapsed_seconds.count() << "s)===" << endl << endl;
 	gout(1);
 	
 	//Add the nodes to path
@@ -936,7 +971,6 @@ void Graph<NodeType, ArcType>::gout(int verbosity)
 	{
 		cout << gop.str();
 	}
-	
 	
 	gop.str(string()); //Clear stringstream after attempting to output
 	string s = gop.str();

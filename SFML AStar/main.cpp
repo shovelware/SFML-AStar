@@ -186,6 +186,19 @@ void outputAstarPathShort(Path* p)
 	}
 }
 
+void outputReadme()
+{
+	//read file
+	string c;
+	ifstream myfile;
+
+	myfile.open("../README.txt");
+	
+	cout << myfile.rdbuf() << endl;
+
+	myfile.close();
+}
+
 void loadGraph(GraphType &g, string nodes, string arcs)
 {
 	//read nodes
@@ -676,19 +689,11 @@ bool clickBtn(const sf::RenderWindow & const w)
 		//Run A*
 		else if (mouseOverButton(btnAStar, w))
 		{
-			//Actual
-			//if (nStart != NULL && nEnd != NULL)
-			//{
-			//	graph.AStar(nStart, nEnd, path);
-			//}
-
-			//Debug
-			if (nEnd != NULL)
+			if (nStart != NULL && nEnd != NULL)
 			{
-				graph.InitAStar(nEnd);
+				graph.AStar(nStart, nEnd, path);
 			}
 
-			//
 			action = true;
 		}
 
@@ -774,56 +779,6 @@ bool clearNode()
 	return action;
 }
 
-bool runUCS(GraphType & g, Node* n1, Node* n2, Path & p)
-{
-	if (n1 != NULL && n2 != NULL)
-	{
-		g.UCS(n1, n2, p);
-		return true;
-	}
-
-	else return false;
-}
-
-bool runUCSA(GraphType & g, Node* n)
-{
-	if (n != NULL)
-	{
-		g.InitAStar(n);
-		return true;
-	}
-
-	else return false;
-}
-
-bool runAStar(GraphType & g, Node* n1, Node* n2, Path & p)
-{
-	if (n1 != NULL && n2 != NULL)
-	{
-		g.AStar(n1, n2, p);
-		return true;
-	}
-
-	else return false;
-}
-
-void PrayThisWorks(GraphType & g, Path & p)
-{
-	int c = g.count() - 1;
-
-	for (int i = 0; i < c; ++i)
-	{
-		for (int j = 0; j < c ; ++j)
-		{
-			if (i != j)
-			{
-				runUCS(g, g.nodeArray()[i], g.nodeArray()[j], p);
-				cout << i << "->" << j << endl;
-			}
-		}
-	}
-}
-
 ////////////////////////////////////////////////////////////
 ///Entrypoint of application 
 //////////////////////////////////////////////////////////// 
@@ -843,7 +798,7 @@ int main()
 	cNode = sf::Color(66, 33, 99, 255);
 	cExp = sf::Color(132, 66, 198, 255);
 	cArc = sf::Color(196, 196, 196, 255);
-	cWeight = sf::Color(196, 128, 196, 255);
+	cWeight = sf::Color(0, 128, 196, 255);
 	cPathNode = sf::Color(0, 255, 255, 255);
 	cPathArc = sf::Color(255, 255, 0, 2555);
 	cData = sf::Color(255, 255, 255, 255);
@@ -866,7 +821,7 @@ int main()
 	cBtnHover = sf::Color(250, 150, 50, 255);
 	cBtnPress = sf::Color(128, 128, 128, 255);
 	cTxt = sf::Color(0, 0, 0, 255);
-	cTxtHover = sf::Color(0, 255, 255, 255);
+	cTxtHover = sf::Color(0, 128, 255, 255);
 	cTxtPress = sf::Color(255, 255, 255, 255);
 
 	//Set up font sizes & Origin
@@ -882,6 +837,7 @@ int main()
 
 	graph.setVerbosity(1);
 
+	outputReadme();
 
 	// Start game loop 
 	while (window.isOpen())
@@ -1024,7 +980,10 @@ int main()
 		{
 			if (!kSpace)
 			{
-				//PrayThisWorks(graph, path);
+				if (nEnd != NULL)
+				{
+					graph.mapNodes(nEnd);
+				}
 			}
 
 			kSpace = true;
