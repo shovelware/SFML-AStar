@@ -5,6 +5,12 @@
 #include <queue>
 #include <sstream>
 
+#include <time.h>
+
+#include <chrono>
+#include <ctime>
+
+
 using namespace std;
 
 template <class NodeType, class ArcType> class GraphArc;
@@ -85,9 +91,9 @@ public:
 	void breadthFirst(Node* pNode, void(*pProcess)(Node*));
 	void breadthFirstPlus(Node* pNode, Node* pTarget, void(*pProcess)(Node*));
 	void UCS(Node* pStart, Node* pTarget, std::vector<Node*>& path);
-	void UCSA(Node* pStart, Node* pTarget);
+	void InitAStar(Node* pTarget);
 	void AStar(Node* pStart, Node* pTarget, std::vector<Node*>& path);
-	void AStarPre(Node* pStart, Node* pTarget, std::vector<Node*>& path);
+	void AStarPrecomp(Node* pStart, Node* pTarget, std::vector<Node*>& path);
 };
 
 template<class NodeType, class ArcType>
@@ -592,7 +598,11 @@ template<class NodeType, class ArcType>
 void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, std::vector<Node*>& path)
 {
 	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
-	gout(1);
+	gout(2);
+
+	//Start timer
+	std::chrono::time_point<std::chrono::system_clock> start, end;
+	start = std::chrono::system_clock::now();
 
 	//Unmark, clear Prev, max G, set up first node
 	clearMarks();
@@ -670,7 +680,11 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, std::vector<Node
 		
 	}
 	
-	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " complete. ===" << endl << endl;
+	//End timer
+	end = std::chrono::system_clock::now();
+	std::chrono::duration<double> elapsed_seconds = end - start;
+
+	gop << "=== UCS from " << pStart->data() << " to " << pTarget->data() << " complete. (" << elapsed_seconds.count() << "s)===" << endl << endl;
 	gout(1);
 
 	//Add the nodes to path
@@ -686,16 +700,16 @@ void Graph<NodeType, ArcType>::UCS(Node* pStart, Node* pTarget, std::vector<Node
 }
 
 template<class NodeType, class ArcType>
-void Graph<NodeType, ArcType>::UCSA(Node* pStart, Node* pTarget)
+void Graph<NodeType, ArcType>::InitAStar(Node* pTarget)
 {
-	vector<Node*> UCSP;
-	UCS(pTarget, pStart, UCSP);
+	//Turn off output so we don't spam the user
+	int tempverb = m_verbosity;
+	m_verbosity = 0;
 
-	//Walk back through the path and set h values to 90% of distance to goal
-	for (vector<Node*>::iterator vIter = UCSP.begin(), vEnd = UCSP.end(); vIter < vEnd; vIter++)
-	{
-		(*vIter)->setH((*vIter)->g() * m_heurMult);
-	}
+	//Set all h values
+
+	//Set output to user's desired level
+	m_verbosity = tempverb;
 }
 
 template<class NodeType, class ArcType>
@@ -703,13 +717,17 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<No
 {
 	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
 	gop << "(UCS used to initialise h values)" << endl << endl;
-	gout(1);
+	gout(2);
+
+	//Start timer
+	std::chrono::time_point<std::chrono::system_clock> start, end;
+	start = std::chrono::system_clock::now();
 
 	//Max other distances
 	maxHs();
 
 	//Init path h by way of UCS
-	UCSA(pStart, pTarget);
+	InitAStar(pTarget);
 
 	//make & set up queue
 	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
@@ -785,7 +803,11 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<No
 			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
 	}
 
-	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " completed ===" << endl;
+	//End timer
+	end = std::chrono::system_clock::now();
+	std::chrono::duration<double> elapsed_seconds = end - start;
+
+	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " complete. (" << elapsed_seconds.count() << "s)===" << endl << endl;
 	gout(1);
 
 	//Add the nodes to path
@@ -801,11 +823,15 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<No
 }
 
 template<class NodeType, class ArcType>
-void Graph<NodeType, ArcType>::AStarPre(Node* pStart, Node* pTarget, std::vector<Node*>& path)
+void Graph<NodeType, ArcType>::AStarPrecomp(Node* pStart, Node* pTarget, std::vector<Node*>& path)
 {
 
 	gop << "=== Precomputed A* from " << pStart->data() << " to " << pTarget->data() << " ===" << endl;
-	
+	gout(2);
+
+	//Start timer
+	std::chrono::time_point<std::chrono::system_clock> start, end;
+	start = std::chrono::system_clock::now();
 
 	//Init H Values
 	mapNodes(pTarget);
@@ -883,8 +909,12 @@ void Graph<NodeType, ArcType>::AStarPre(Node* pStart, Node* pTarget, std::vector
 		if (!pq.empty())
 			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
 	}
-	
-	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " completed ===" << endl;
+
+	//End timer
+	end = std::chrono::system_clock::now();
+	std::chrono::duration<double> elapsed_seconds = end - start;
+
+	gop << "=== A* from " << pStart->data() << " to " << pTarget->data() << " complete. (" << elapsed_seconds.count() << "s)===" << endl << endl;
 	gout(1);
 	
 	//Add the nodes to path

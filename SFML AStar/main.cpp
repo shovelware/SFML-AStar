@@ -334,7 +334,7 @@ void drawArcs(sf::RenderWindow & w, GraphType & const g)
 {
 	t.setFont(f);
 	t.setOrigin(tOrigin);
-	vector<char> drawn;
+	vector<char> drawnNodes;
 
 	//Draw Arcs
 	for (int n = 0, numNodes = g.count(); n < numNodes; ++n)
@@ -342,12 +342,16 @@ void drawArcs(sf::RenderWindow & w, GraphType & const g)
 		Node* const tempNode = g.nodeArray()[n];
 		bool mouseOver = mouseOverNode(tempNode->position() + b, w, nodeRadius);
 
-		drawn.push_back(tempNode->data());
+		drawnNodes.push_back(tempNode->data());
 
 		for (list<Arc>::const_iterator vIter = tempNode->arcList().begin(), vEnd = tempNode->arcList().end(); vIter != vEnd; ++vIter)
 		{
+
+			bool drawn = std::find(drawnNodes.begin(), drawnNodes.end(), vIter->node()->data()) != drawnNodes.end();
+
 			//If we haven't drawn the node at arc end (And thus all it's arcs) so we don't double up
-			if (std::find(drawn.begin(), drawn.end(), vIter->node()->data()) != drawn.end())
+			//But if we have our mouse over the node draw all it's arcs
+			if (mouseOver || !drawn)
 			{
 				sf::Vertex line[] =
 				{
@@ -636,6 +640,25 @@ bool setNode(GraphType &g, sf::RenderWindow & const w)
 	return action;
 }
 
+bool clearNode(GraphType & g)
+{
+	bool action = false;
+
+	if (nEnd != NULL)
+	{
+		nEnd = NULL;
+		action = true;
+	}
+
+	else if (nStart != NULL)
+	{
+		nStart = NULL;
+		action = true;
+	}
+
+	return action;
+}
+
 bool clickBtn(const sf::RenderWindow & const w)
 {
 	bool action = false;
@@ -653,10 +676,19 @@ bool clickBtn(const sf::RenderWindow & const w)
 		//Run A*
 		else if (mouseOverButton(btnAStar, w))
 		{
-			if (nStart != NULL && nEnd != NULL)
+			//Actual
+			//if (nStart != NULL && nEnd != NULL)
+			//{
+			//	graph.AStar(nStart, nEnd, path);
+			//}
+
+			//Debug
+			if (nEnd != NULL)
 			{
-				graph.AStar(nStart, nEnd, path);
+				graph.InitAStar(nEnd);
 			}
+
+			//
 			action = true;
 		}
 
@@ -668,7 +700,7 @@ bool clickBtn(const sf::RenderWindow & const w)
 
 			else if (nStart != NULL && nEnd != NULL)
 			{
-				graph.AStarPre(nStart, nEnd, path);
+				graph.AStarPrecomp(nStart, nEnd, path);
 			}
 			action = true;
 		}
@@ -753,11 +785,11 @@ bool runUCS(GraphType & g, Node* n1, Node* n2, Path & p)
 	else return false;
 }
 
-bool runUCSA(GraphType & g, Node* n1, Node * n2)
+bool runUCSA(GraphType & g, Node* n)
 {
-	if (n1 != NULL && n2 != NULL)
+	if (n != NULL)
 	{
-		g.UCSA(n1, n2);
+		g.InitAStar(n);
 		return true;
 	}
 
@@ -912,6 +944,7 @@ int main()
 		{
 			if (!rMouse)
 			{
+				clearNode(graph);
 			}
 
 			rMouse = true;
