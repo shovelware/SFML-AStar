@@ -22,9 +22,10 @@
 #include <fstream>
 #include <string>
 #include <list>
+#include <time.h>
+#include <algorithm>
 
 #include "Graph.hpp"
-#include <time.h>
 
 using std::cout;
 using std::endl;
@@ -82,9 +83,9 @@ const string maxstr = "X";
 
 //Bools for toggling drawing of graph data
 bool drawD = 1;
-bool drawG = 1;
-bool drawH = 1;
-bool drawW = 1;
+bool drawG = 0;
+bool drawH = 0;
+bool drawW = 0;
 
 ////////////////////////////////////////////////////////////
 ///Functions
@@ -333,38 +334,42 @@ void drawArcs(sf::RenderWindow & w, GraphType & const g)
 {
 	t.setFont(f);
 	t.setOrigin(tOrigin);
+	vector<char> drawn;
 
 	//Draw Arcs
 	for (int n = 0, numNodes = g.count(); n < numNodes; ++n)
 	{
 		Node* const tempNode = g.nodeArray()[n];
+		bool mouseOver = mouseOverNode(tempNode->position() + b, w, nodeRadius);
+
+		drawn.push_back(tempNode->data());
 
 		for (list<Arc>::const_iterator vIter = tempNode->arcList().begin(), vEnd = tempNode->arcList().end(); vIter != vEnd; ++vIter)
 		{
-			sf::Vertex line[] =
+			//If we haven't drawn the node at arc end (And thus all it's arcs) so we don't double up
+			if (std::find(drawn.begin(), drawn.end(), vIter->node()->data()) != drawn.end())
 			{
-				sf::Vertex(tempNode->position() + b, cArc),
-				sf::Vertex((*vIter).node()->position() + b, cArc)
-			};
+				sf::Vertex line[] =
+				{
+					sf::Vertex(tempNode->position() + b, cArc),
+					sf::Vertex((*vIter).node()->position() + b, cArc)
+				};
 
-			w.draw(line, 2, sf::Lines);
-
-			//Draw weight
-			if (drawW)
-			{
-				sf::Vector2f wPos = midpoint(line[0].position, line[1].position);
-
-				t.setCharacterSize(fW);
-				t.setPosition(wPos);
-				t.setString(numToStr((*vIter).weight()));
-				t.setColor(cWeight);
-				t.setOrigin(tOrigin);
-
-				line[0] = sf::Vertex(wPos, cArc);
-				line[1] = sf::Vertex(t.getPosition(), cArc);
 				w.draw(line, 2, sf::Lines);
 
-				w.draw(t);
+				//Draw weight
+				if (drawW || mouseOver)
+				{
+					sf::Vector2f wPos = midpoint(line[0].position, line[1].position);
+
+					t.setCharacterSize(fW);
+					t.setPosition(wPos + sf::Vector2f(0, nodeRadius));
+					t.setString(numToStr((*vIter).weight()));
+					t.setColor(cWeight);
+					t.setOrigin(tOrigin);
+
+					w.draw(t);
+				}
 			}
 		}
 
@@ -386,6 +391,9 @@ void drawNodes(sf::RenderWindow & const w, GraphType & const g, Path & p)
 		//Pull out the node we're looking at
 		Node* const tempNode = g.nodeArray()[n];
 		circ.setPosition(tempNode->position() + b);
+		bool mouseOver = mouseOverNode(tempNode->position() + b, w, nodeRadius);
+		bool inPath = nodeInPath(tempNode, &p);
+
 
 		//If our mouse is on the node
 		if (mouseOverNode(tempNode->position() + b, w, nodeRadius))
@@ -436,7 +444,7 @@ void drawNodes(sf::RenderWindow & const w, GraphType & const g, Path & p)
 		}
 
 		//Draw G
-		if (drawG)
+		if (drawG || mouseOver || inPath)
 		{
 			t.setCharacterSize(fG);
 			t.setPosition((tempNode->position() + b) - sf::Vector2f(nodeRadius / 2, nodeRadius / 2));
@@ -455,7 +463,7 @@ void drawNodes(sf::RenderWindow & const w, GraphType & const g, Path & p)
 		}
 
 		//Draw H
-		if (drawH)
+		if (drawH || mouseOver || inPath)
 		{
 			t.setCharacterSize(fH);
 			t.setPosition((tempNode->position() + b) + sf::Vector2f(nodeRadius * 1.5, nodeRadius * 2));
@@ -803,7 +811,7 @@ int main()
 	cNode = sf::Color(66, 33, 99, 255);
 	cExp = sf::Color(132, 66, 198, 255);
 	cArc = sf::Color(196, 196, 196, 255);
-	cWeight = sf::Color(196, 128, 128, 255);
+	cWeight = sf::Color(196, 128, 196, 255);
 	cPathNode = sf::Color(0, 255, 255, 255);
 	cPathArc = sf::Color(255, 255, 0, 2555);
 	cData = sf::Color(255, 255, 255, 255);
@@ -833,7 +841,7 @@ int main()
 	fD = nodeRadius * 2;
 	fG = nodeRadius;
 	fH = nodeRadius;
-	fW = nodeRadius;
+	fW = nodeRadius * 1.2;
 	tOrigin = sf::Vector2f(nodeRadius / 2, nodeRadius + nodeRadius / 2);
 	
 	//Set up graph
@@ -998,6 +1006,7 @@ int main()
 		
 		drawGraph(window, graph, &path);
 		drawMenu(window);
+
 		window.display();
 
 	}
