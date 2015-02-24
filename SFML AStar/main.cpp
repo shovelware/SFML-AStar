@@ -835,7 +835,7 @@ int main()
 	loadGraphDrawable(graph, "AStarNodes.txt", "AStarArcs.txt");
 	cout << endl;
 
-	graph.setVerbosity(1);
+	graph.setVerbosity(2);
 
 	outputReadme();
 

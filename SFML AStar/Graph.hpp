@@ -105,6 +105,14 @@ public:
 };
 
 template<class NodeType, class ArcType>
+class ANodeSearchCostComparer {
+public:
+	bool operator()(GraphNode<NodeType, ArcType> * n1, GraphNode<NodeType, ArcType> * n2) {
+		return n1->g() + n1->h() > n2->g() + n2->h();
+	}
+};
+
+template<class NodeType, class ArcType>
 Graph<NodeType, ArcType>::Graph( int size ) : m_maxNodes( size ), m_heurMult(0.9) {
 	int i;
 	m_pNodes = new Node * [m_maxNodes];
@@ -765,7 +773,7 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<No
 	InitAStar(pTarget);
 
 	//make & set up queue
-	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
+	priority_queue<Node*, vector<Node*>, ANodeSearchCostComparer<NodeType, ArcType>> pq;
 	
 	//Unmark, clear Prev, max G, set up first node
 	clearMarks();
@@ -806,7 +814,7 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<No
 				if (fn < childNode->g())
 				{
 					//Set the node's internal weight to the arc from previous plus internal weight of previous
-					childNode->setG(fn + childNode->h());
+					childNode->setG(fn);
 					//Set previous pointer of the node to the previous node in the new path
 					childNode->setPrev(pq.top());
 	
@@ -832,10 +840,11 @@ void Graph<NodeType, ArcType>::AStar(Node* pStart, Node* pTarget, std::vector<No
 		gop << "Popping: " << pq.top()->data() << endl << endl;
 		gout(2);
 	
-		pq.pop();
 	
 		if (!pq.empty())
-			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), 
+			ANodeSearchCostComparer<NodeType, ArcType>());
+		pq.pop();
 	}
 	
 	//End timer
@@ -872,7 +881,7 @@ void Graph<NodeType, ArcType>::AStarPrecomp(Node* pStart, Node* pTarget, std::ve
 	mapNodes(pTarget);
 	
 	//make & set up queue
-	priority_queue<Node*, vector<Node*>, NodeSearchCostComparer<NodeType, ArcType>> pq;
+	priority_queue<Node*, vector<Node*>, ANodeSearchCostComparer<NodeType, ArcType>> pq;
 
 	//Unmark, clear Prev, max G, set up first node
 	clearMarks();
@@ -913,7 +922,7 @@ void Graph<NodeType, ArcType>::AStarPrecomp(Node* pStart, Node* pTarget, std::ve
 				if (fn < childNode->g())
 				{
 					//Set the node's internal weight to the arc from previous plus internal weight of previous
-					childNode->setG(fn + childNode->h());
+					childNode->setG(fn);
 					//Set previous pointer of the node to the previous node in the new path
 					childNode->setPrev(pq.top());
 
@@ -938,11 +947,12 @@ void Graph<NodeType, ArcType>::AStarPrecomp(Node* pStart, Node* pTarget, std::ve
 		}
 		gop << "Popping: " << pq.top()->data() << endl << endl;
 		gout(2);
-
+	if (!pq.empty())
+			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), 
+			ANodeSearchCostComparer<NodeType, ArcType>());
 		pq.pop();
 
-		if (!pq.empty())
-			make_heap(const_cast<Node**>(&pq.top()), const_cast<Node**>(&pq.top()) + pq.size(), NodeSearchCostComparer<NodeType, ArcType>());
+		
 	}
 
 	//End timer
